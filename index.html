@@ -10,6 +10,7 @@
 
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;700;900&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
 
     <style>
         body {
@@ -19,19 +20,19 @@
         }
 
         .text-gradient {
-            background: linear-gradient(to right, #00C6FF, #0072FF);
+            background: linear-gradient(to right, #52d1ff, #0072FF);
             -webkit-background-clip: text;
             -webkit-text-fill-color: transparent;
         }
 
         .btn-primary {
-            background: linear-gradient(to right, #00C6FF, #0072FF);
+            background: linear-gradient(to right, #52d1ff, #0072FF);
             transition: all 0.3s ease;
         }
 
         .btn-primary:hover {
             transform: translateY(-2px);
-            filter: brightness(1.1);
+            box-shadow: 0 0 15px rgba(82, 209, 255, 0.4);
         }
 
         .vip-card {
@@ -41,49 +42,23 @@
         }
 
         .vip-card:hover {
-            border-color: #0072FF;
+            border-color: #52d1ff;
             transform: translateY(-5px);
-        }
-
-        /* Estilos para el botón de Google Calendar */
-        .calendar-btn-container {
-            position: fixed;
-            bottom: 20px;
-            right: 20px;
-            z-index: 1000;
         }
     </style>
 </head>
-
-<script>
-    // Función para que TODOS los botones de reserva funcionen
-    document.addEventListener('DOMContentLoaded', function () {
-
-        // 1. Seleccionamos todos los botones que deberían abrir el calendario
-        const botonesReserva = document.querySelectorAll('a[href*="calendar.app.google"], a[href="#contacto"], .btn-primary');
-
-        botonesReserva.forEach(boton => {
-            boton.addEventListener('click', function (e) {
-                // Si el enlace es externo (como tu calendario), dejamos que abra en pestaña nueva
-                // Pero nos aseguramos de que el enlace sea el correcto
-                if (this.hostname !== window.location.hostname || this.href.includes('calendar.app.google')) {
-                    return; // Deja que el navegador haga su trabajo
-                }
-
-                // Si es un botón interno, lo redirigimos a tu Google Calendar
-                e.preventDefault();
-                window.open('https://calendar.app.google/FmRhrsrxmWLBsD5X6', '_blank');
-            });
-        });
-    });
-</script>
 
 <body class="bg-[#0d1117]">
 
     <header class="sticky top-0 z-50 bg-[#0d1117]/90 backdrop-blur-md border-b border-gray-800">
         <nav class="max-w-7xl mx-auto px-6 py-4 flex justify-between items-center">
             <a href="#" class="text-3xl font-black tracking-tighter text-gradient">YOIA.io</a>
+
             <div class="hidden md:flex space-x-8 items-center">
+                <a href="https://yoia.yzz.me/"
+                    class="text-white font-bold hover:text-[#52d1ff] transition flex items-center gap-2">
+                    <i class="fas fa-comments text-xs"></i> FORO
+                </a>
                 <a href="#servicios" class="hover:text-blue-400 transition">Servicios</a>
                 <a href="#academia" class="hover:text-blue-400 transition">Academia</a>
                 <a href="vip.html" class="text-yellow-500 font-bold hover:text-yellow-400 transition">ÁREA VIP</a>
@@ -102,7 +77,7 @@
                 Escala tu Negocio. <br><span class="text-gradient">Automatiza tu Éxito.</span>
             </h1>
             <p class="text-xl md:text-2xl text-gray-400 mb-10">
-                Por **Alejandro G. Ramiro Sechi**. Implemento ecosistemas de IA que ahorran tiempo y multiplican
+                Por Alejandro G. Ramiro Sechi. Implemento ecosistemas de IA que ahorran tiempo y multiplican
                 beneficios.
             </p>
             <div class="flex flex-col md:flex-row justify-center gap-4">
@@ -110,9 +85,9 @@
                     class="btn-primary px-10 py-4 rounded-full text-white font-bold text-lg">
                     Reserva una Consultoría
                 </a>
-                <a href="#academia"
+                <a href="https://yoia.yzz.me/"
                     class="bg-gray-800 hover:bg-gray-700 px-10 py-4 rounded-full text-white font-bold text-lg transition">
-                    Ver Casos de Éxito
+                    Ir al Foro
                 </a>
             </div>
         </div>
@@ -121,96 +96,66 @@
     <section id="servicios" class="py-24 px-6 max-w-7xl mx-auto">
         <h2 class="text-4xl font-bold text-center mb-16">Servicios de Automatización</h2>
         <div class="grid md:grid-cols-3 gap-8">
-            <div class="vip-card p-8 rounded-2xl">
-                <div class="text-blue-500 text-4xl mb-4">⚙️</div>
+            <div class="vip-card p-8 rounded-2xl text-center">
+                <div class="text-blue-500 text-4xl mb-4"><i class="fas fa-microchip"></i></div>
                 <h3 class="text-2xl font-bold mb-3">Consultoría IA</h3>
-                <p class="text-gray-400 text-sm">Analizo tu empresa y diseño una hoja de ruta personalizada para
-                    implementar IA.</p>
+                <p class="text-gray-400 text-sm">Analizo tu empresa y diseño una hoja de ruta personalizada.</p>
             </div>
-            <div class="vip-card p-8 rounded-2xl">
-                <div class="text-blue-500 text-4xl mb-4">🚀</div>
-                <h3 class="text-2xl font-bold mb-3">Workflows Make/Zapier</h3>
-                <p class="text-gray-400 text-sm">Conecto tus aplicaciones para que tu negocio funcione solo mientras
-                    duermes.</p>
+            <div class="vip-card p-8 rounded-2xl text-center">
+                <div class="text-blue-500 text-4xl mb-4"><i class="fas fa-project-diagram"></i></div>
+                <h3 class="text-2xl font-bold mb-3">Workflows Automáticos</h3>
+                <p class="text-gray-400 text-sm">Conexión de apps con Make/Zapier para operatividad 24/7.</p>
             </div>
-            <div class="vip-card p-8 rounded-2xl">
-                <div class="text-blue-500 text-4xl mb-4">🤖</div>
-                <h3 class="text-2xl font-bold mb-3">LLMs a Medida</h3>
-                <p class="text-gray-400 text-sm">Entrenamiento de modelos de lenguaje personalizados para tu atención al
-                    cliente.</p>
+            <div class="vip-card p-8 rounded-2xl text-center">
+                <div class="text-blue-500 text-4xl mb-4"><i class="fas fa-robot"></i></div>
+                <h3 class="text-2xl font-bold mb-3">Agentes IA</h3>
+                <p class="text-gray-400 text-sm">Entrenamiento de LLMs para atención al cliente y ventas.</p>
             </div>
         </div>
     </section>
 
-    <section id="academia" class="py-24 bg-[#161b22] px-6">
+    <section id="academia" class="py-24 bg-[#161b22] px-6 text-center">
         <div class="max-w-7xl mx-auto">
-            <h2 class="text-4xl font-bold text-center mb-4">Academia YO IA</h2>
-            <p class="text-center text-gray-400 mb-12">Aprende automatización de nivel experto totalmente gratis.</p>
-            <div class="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
-                <div class="bg-black rounded-xl overflow-hidden shadow-2xl">
-                    <iframe class="w-full aspect-video" src="https://www.youtube.com/embed/VIDEO_ID_1" frameborder="0"
-                        allowfullscreen></iframe>
-                    <div class="p-4">
-                        <h4 class="font-bold">Cómo usar Make.com para principiantes</h4>
+            <h2 class="text-4xl font-bold mb-4">Academia YO IA</h2>
+            <p class="text-gray-400 mb-12">Aprende automatización de nivel experto totalmente gratis.</p>
+            <div class="grid md:grid-cols-3 gap-8 mb-12">
+                <div class="bg-black p-2 rounded-xl border border-gray-800">
+                    <div class="aspect-video bg-gray-900 rounded flex items-center justify-center">
+                        <i class="fab fa-youtube text-red-600 text-5xl"></i>
                     </div>
+                    <h4 class="mt-4 font-bold">Make.com Pro</h4>
                 </div>
-                <div class="bg-black rounded-xl overflow-hidden shadow-2xl">
-                    <iframe class="w-full aspect-video" src="https://www.youtube.com/embed/VIDEO_ID_2" frameborder="0"
-                        allowfullscreen></iframe>
-                    <div class="p-4">
-                        <h4 class="font-bold">Prompts avanzados para escalado de empresas</h4>
+                <div class="bg-black p-2 rounded-xl border border-gray-800">
+                    <div class="aspect-video bg-gray-900 rounded flex items-center justify-center">
+                        <i class="fab fa-youtube text-red-600 text-5xl"></i>
                     </div>
+                    <h4 class="mt-4 font-bold">Prompts de Escalado</h4>
                 </div>
-                <div class="bg-black rounded-xl overflow-hidden shadow-2xl">
-                    <iframe class="w-full aspect-video" src="https://www.youtube.com/embed/VIDEO_ID_3" frameborder="0"
-                        allowfullscreen></iframe>
-                    <div class="p-4">
-                        <h4 class="font-bold">Estrategia de IA para 2025</h4>
+                <div class="bg-black p-2 rounded-xl border border-gray-800">
+                    <div class="aspect-video bg-gray-900 rounded flex items-center justify-center">
+                        <i class="fab fa-youtube text-red-600 text-5xl"></i>
                     </div>
+                    <h4 class="mt-4 font-bold">Estrategia 2026</h4>
                 </div>
             </div>
-        </div>
-    </section>
-
-    <section id="vip" class="py-24 px-6 max-w-5xl mx-auto text-center">
-        <div class="border-gradient p-12 rounded-3xl bg-gradient-to-b from-[#1a202c] to-[#0d1117]">
-            <h2 class="text-4xl font-black text-white mb-6">Acceso VIP YO IA</h2>
-            <p class="text-xl text-gray-300 mb-8">
-                Accede a mi bóveda privada de Prompts y Blueprints de automatización.
-            </p>
-            <ul class="text-left max-w-md mx-auto mb-10 space-y-4 text-gray-400">
-                <li class="flex items-center"><span class="text-blue-500 mr-2">✔</span> Biblioteca de Prompts exclusivos
-                </li>
-                <li class="flex items-center"><span class="text-blue-500 mr-2">✔</span> Archivos JSON de Make.com listos
-                    para importar</li>
-                <li class="flex items-center"><span class="text-blue-500 mr-2">✔</span> Consultas personalizadas vía
-                    chat</li>
-            </ul>
-            <a href="https://tally.so/r/b5j9D2"
-                class="btn-primary inline-block px-12 py-4 rounded-full text-white font-black text-xl">
-                ¡Únete ahora!
+            <a href="https://yoia.yzz.me/" class="text-[#52d1ff] font-bold hover:underline">
+                Accede a todos los tutoriales en el Foro →
             </a>
         </div>
     </section>
 
-    <footer class="py-12 border-t border-gray-800 text-center text-gray-500 text-sm">
-        <p>&copy; 2025 YOIA.io | Alejandro G. Ramiro Sechi. <br> Automatización con propósito.</p>
+    <footer class="py-12 border-t border-gray-800 text-center text-gray-400 text-sm">
+        <div class="flex justify-center space-x-6 mb-6 text-xl">
+            <a href="https://www.youtube.com/@TU_CANAL" target="_blank" class="hover:text-red-500 transition">
+                <i class="fab fa-youtube"></i>
+            </a>
+            <a href="https://www.linkedin.com/in/alejandrogramiro/" target="_blank"
+                class="hover:text-blue-500 transition">
+                <i class="fab fa-linkedin"></i>
+            </a>
+        </div>
+        <p>&copy; 2026 YOIA.io | Alejandro G. Ramiro Sechi. <br> Automatización con propósito.</p>
     </footer>
-
-    <link href="https://calendar.google.com/calendar/scheduling-button-script.css" rel="stylesheet">
-    <script src="https://calendar.google.com/calendar/scheduling-button-script.js" async></script>
-    <script>
-        (function () {
-            window.addEventListener('load', function () {
-                calendar.schedulingButton.load({
-                    url: 'https://calendar.app.google/FmRhrsrxmWLBsD5X6',
-                    label: 'Reserva una Consultoría',
-                    color: '#0072FF',
-                    target: document.body,
-                });
-            });
-        })();
-    </script>
 
 </body>
 

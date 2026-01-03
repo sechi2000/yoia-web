@@ -1,9 +1,0 @@
-{
-    "added": [
-        "app=core&module=applications&controller=api&tab=webhooks&do=settings&searchResult=webhook_logs_success"
-    ],
-    "edited": [
-        "app=core&module=applications&controller=enhancements"
-    ],
-    "removed": []
-}

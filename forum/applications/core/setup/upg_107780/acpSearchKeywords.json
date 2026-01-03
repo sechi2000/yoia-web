@@ -1,9 +1,0 @@
-{
-    "added": [
-        "app=core&module=settings&controller=login&tab=settings&searchResult=form_login_after_inactivity_notification"
-    ],
-    "edited": [
-        "app=core&module=moderation&controller=reportedContentTypes"
-    ],
-    "removed": []
-}
