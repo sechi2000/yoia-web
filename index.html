@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>YOIA.io - Alejandro G. Ramiro Sechi | Experto en IA y Automatización</title>
+    <title>YOIA.io | Alejandro G. Ramiro Sechi - Ecosistemas de IA y Automatización</title>
 
     <link rel="icon" type="image/png" href="./img/favicon.png">
 
@@ -28,11 +28,12 @@
         .btn-primary {
             background: linear-gradient(to right, #52d1ff, #0072FF);
             transition: all 0.3s ease;
+            box-shadow: 0 4px 15px rgba(82, 209, 255, 0.2);
         }
 
         .btn-primary:hover {
             transform: translateY(-2px);
-            box-shadow: 0 0 15px rgba(82, 209, 255, 0.4);
+            box-shadow: 0 0 20px rgba(82, 209, 255, 0.4);
         }
 
         .vip-card {
@@ -44,6 +45,15 @@
         .vip-card:hover {
             border-color: #52d1ff;
             transform: translateY(-5px);
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+        }
+
+        .nav-link {
+            transition: color 0.3s ease;
+        }
+
+        .nav-link:hover {
+            color: #52d1ff;
         }
     </style>
 </head>
@@ -53,108 +63,119 @@
     <header class="sticky top-0 z-50 bg-[#0d1117]/90 backdrop-blur-md border-b border-gray-800">
         <nav class="max-w-7xl mx-auto px-6 py-4 flex justify-between items-center">
             <a href="#" class="text-3xl font-black tracking-tighter text-gradient">YOIA.io</a>
-
             <div class="hidden md:flex space-x-8 items-center">
-                <a href="https://yoia.yzz.me/"
-                    class="text-white font-bold hover:text-[#52d1ff] transition flex items-center gap-2">
-                    <i class="fas fa-comments text-xs"></i> FORO
+                <a href="https://yoia.yzz.me/" class="nav-link font-bold flex items-center gap-2">
+                    <i class="fas fa-users text-sm"></i> FORO
                 </a>
-                <a href="#servicios" class="hover:text-blue-400 transition">Servicios</a>
-                <a href="#academia" class="hover:text-blue-400 transition">Academia</a>
-                <a href="vip.html" class="text-yellow-500 font-bold hover:text-yellow-400 transition">ÁREA VIP</a>
+                <a href="#servicios" class="nav-link">Servicios</a>
+                <a href="#academia" class="nav-link">Academia</a>
+                <a href="vip.html" class="text-yellow-500 font-bold hover:text-yellow-400">ÁREA VIP</a>
                 <a href="https://calendar.app.google/FmRhrsrxmWLBsD5X6" target="_blank"
-                    class="btn-primary px-5 py-2 rounded-full text-white text-sm font-bold">Reserva Cita</a>
+                    class="btn-primary px-6 py-2 rounded-full text-white text-sm font-bold">RESERVA CITA</a>
             </div>
         </nav>
     </header>
 
-    <section class="relative min-h-[80vh] flex items-center justify-center overflow-hidden">
-        <img src="./img/ia-banner.jpg" alt="IA Background"
-            class="absolute inset-0 w-full h-full object-cover opacity-20">
-
-        <div class="relative z-10 text-center px-6 max-w-4xl">
-            <h1 class="text-5xl md:text-7xl font-black text-white mb-6 leading-tight">
+    <section class="relative min-h-[90vh] flex items-center justify-center overflow-hidden">
+        <div class="absolute inset-0 bg-[url('./img/ia-banner.jpg')] bg-cover bg-center opacity-10"></div>
+        <div class="relative z-10 text-center px-6 max-w-5xl">
+            <h1 class="text-6xl md:text-8xl font-black text-white mb-6 leading-tight tracking-tight">
                 Escala tu Negocio. <br><span class="text-gradient">Automatiza tu Éxito.</span>
             </h1>
-            <p class="text-xl md:text-2xl text-gray-400 mb-10">
-                Por Alejandro G. Ramiro Sechi. Implemento ecosistemas de IA que ahorran tiempo y multiplican
-                beneficios.
+            <p class="text-xl md:text-3xl text-gray-400 mb-10 max-w-3xl mx-auto leading-relaxed">
+                Por Alejandro G. Ramiro Sechi. Implemento ecosistemas de IA que ahorran tiempo y multiplican beneficios
+                estratégicos. [cite: 59]
             </p>
-            <div class="flex flex-col md:flex-row justify-center gap-4">
+            <div class="flex flex-col md:flex-row justify-center gap-6">
                 <a href="https://calendar.app.google/FmRhrsrxmWLBsD5X6" target="_blank"
-                    class="btn-primary px-10 py-4 rounded-full text-white font-bold text-lg">
-                    Reserva una Consultoría
+                    class="btn-primary px-12 py-5 rounded-full text-white font-black text-xl">
+                    Reserva una Consultoría [cite: 60]
                 </a>
                 <a href="https://yoia.yzz.me/"
-                    class="bg-gray-800 hover:bg-gray-700 px-10 py-4 rounded-full text-white font-bold text-lg transition">
-                    Ir al Foro
+                    class="bg-gray-800 hover:bg-gray-700 px-12 py-5 rounded-full text-white font-black text-xl transition border border-gray-700">
+                    Comunidad Oficial
                 </a>
             </div>
         </div>
     </section>
 
-    <section id="servicios" class="py-24 px-6 max-w-7xl mx-auto">
-        <h2 class="text-4xl font-bold text-center mb-16">Servicios de Automatización</h2>
-        <div class="grid md:grid-cols-3 gap-8">
-            <div class="vip-card p-8 rounded-2xl text-center">
-                <div class="text-blue-500 text-4xl mb-4"><i class="fas fa-microchip"></i></div>
-                <h3 class="text-2xl font-bold mb-3">Consultoría IA</h3>
-                <p class="text-gray-400 text-sm">Analizo tu empresa y diseño una hoja de ruta personalizada.</p>
+    <section id="servicios" class="py-32 px-6 max-w-7xl mx-auto">
+        <div class="text-center mb-20">
+            <h2 class="text-4xl md:text-5xl font-bold text-white mb-4">Soluciones de Arquitectura IA</h2>
+            <p class="text-gray-400 text-lg">De la idea a la ejecución tecnológica autónoma.</p>
+        </div>
+        <div class="grid md:grid-cols-3 gap-10">
+            <div class="vip-card p-10 rounded-3xl">
+                <i class="fas fa-brain text-4xl text-[#52d1ff] mb-6"></i>
+                <h3 class="text-2xl font-bold mb-4 text-white">Consultoría Estratégica</h3>
+                <p class="text-gray-400 leading-relaxed">Diseño de hojas de ruta personalizadas para integrar IA en
+                    procesos empresariales críticos.</p>
             </div>
-            <div class="vip-card p-8 rounded-2xl text-center">
-                <div class="text-blue-500 text-4xl mb-4"><i class="fas fa-project-diagram"></i></div>
-                <h3 class="text-2xl font-bold mb-3">Workflows Automáticos</h3>
-                <p class="text-gray-400 text-sm">Conexión de apps con Make/Zapier para operatividad 24/7.</p>
+            <div class="vip-card p-10 rounded-3xl">
+                <i class="fas fa-sync text-4xl text-[#52d1ff] mb-6"></i>
+                <h3 class="text-2xl font-bold mb-4 text-white">Ecosistemas Make/n8n</h3>
+                <p class="text-gray-400 leading-relaxed">Automatización de flujos de trabajo complejos que conectan todo
+                    tu stack tecnológico.</p>
             </div>
-            <div class="vip-card p-8 rounded-2xl text-center">
-                <div class="text-blue-500 text-4xl mb-4"><i class="fas fa-robot"></i></div>
-                <h3 class="text-2xl font-bold mb-3">Agentes IA</h3>
-                <p class="text-gray-400 text-sm">Entrenamiento de LLMs para atención al cliente y ventas.</p>
+            <div class="vip-card p-10 rounded-3xl">
+                <i class="fas fa-comments-dollar text-4xl text-[#52d1ff] mb-6"></i>
+                <h3 class="text-2xl font-bold mb-4 text-white">Agentes Autónomos</h3>
+                <p class="text-gray-400 leading-relaxed">Implementación de agentes inteligentes entrenados con tus datos
+                    para soporte y ventas.</p>
             </div>
         </div>
     </section>
 
-    <section id="academia" class="py-24 bg-[#161b22] px-6 text-center">
-        <div class="max-w-7xl mx-auto">
-            <h2 class="text-4xl font-bold mb-4">Academia YO IA</h2>
-            <p class="text-gray-400 mb-12">Aprende automatización de nivel experto totalmente gratis.</p>
-            <div class="grid md:grid-cols-3 gap-8 mb-12">
-                <div class="bg-black p-2 rounded-xl border border-gray-800">
-                    <div class="aspect-video bg-gray-900 rounded flex items-center justify-center">
-                        <i class="fab fa-youtube text-red-600 text-5xl"></i>
+    <section id="academia" class="py-32 bg-[#161b22] px-6">
+        <div class="max-w-7xl mx-auto text-center">
+            <h2 class="text-4xl md:text-5xl font-bold text-white mb-6">Academia YO IA [cite: 70]</h2>
+            <p class="text-gray-400 text-xl mb-16 max-w-2xl mx-auto">Tutoriales y casos prácticos sobre Copilot Studio y
+                arquitectura de LLMs. [cite: 35]</p>
+
+            <div class="grid md:grid-cols-3 gap-8 mb-16">
+                <div class="group cursor-pointer">
+                    <div
+                        class="bg-black rounded-2xl overflow-hidden aspect-video relative flex items-center justify-center border border-gray-800 group-hover:border-[#52d1ff] transition">
+                        <i class="fab fa-youtube text-5xl text-red-600"></i>
                     </div>
-                    <h4 class="mt-4 font-bold">Make.com Pro</h4>
+                    <h4 class="mt-6 font-bold text-white text-lg">Make.com para Principiantes [cite: 75]</h4>
                 </div>
-                <div class="bg-black p-2 rounded-xl border border-gray-800">
-                    <div class="aspect-video bg-gray-900 rounded flex items-center justify-center">
-                        <i class="fab fa-youtube text-red-600 text-5xl"></i>
+                <div class="group cursor-pointer">
+                    <div
+                        class="bg-black rounded-2xl overflow-hidden aspect-video relative flex items-center justify-center border border-gray-800 group-hover:border-[#52d1ff] transition">
+                        <i class="fab fa-youtube text-5xl text-red-600"></i>
                     </div>
-                    <h4 class="mt-4 font-bold">Prompts de Escalado</h4>
+                    <h4 class="mt-6 font-bold text-white text-lg">Prompts de Escalado [cite: 76]</h4>
                 </div>
-                <div class="bg-black p-2 rounded-xl border border-gray-800">
-                    <div class="aspect-video bg-gray-900 rounded flex items-center justify-center">
-                        <i class="fab fa-youtube text-red-600 text-5xl"></i>
+                <div class="group cursor-pointer">
+                    <div
+                        class="bg-black rounded-2xl overflow-hidden aspect-video relative flex items-center justify-center border border-gray-800 group-hover:border-[#52d1ff] transition">
+                        <i class="fab fa-youtube text-5xl text-red-600"></i>
                     </div>
-                    <h4 class="mt-4 font-bold">Estrategia 2026</h4>
+                    <h4 class="mt-6 font-bold text-white text-lg">Estrategia IA 2026 [cite: 77]</h4>
                 </div>
             </div>
-            <a href="https://yoia.yzz.me/" class="text-[#52d1ff] font-bold hover:underline">
-                Accede a todos los tutoriales en el Foro →
+            <a href="https://yoia.yzz.me/"
+                class="btn-primary px-10 py-4 rounded-full text-white font-bold inline-flex items-center gap-3">
+                ACCEDER A LA ACADEMIA COMPLETA <i class="fas fa-arrow-right"></i>
             </a>
         </div>
     </section>
 
-    <footer class="py-12 border-t border-gray-800 text-center text-gray-400 text-sm">
-        <div class="flex justify-center space-x-6 mb-6 text-xl">
-            <a href="https://www.youtube.com/@TU_CANAL" target="_blank" class="hover:text-red-500 transition">
-                <i class="fab fa-youtube"></i>
+    <footer class="py-20 border-t border-gray-800 text-center">
+        <div class="flex justify-center space-x-10 mb-10">
+            <a href="https://www.youtube.com/@AlejandroYOIA" target="_blank"
+                class="text-3xl text-gray-500 hover:text-red-500 transition">
+                <i class="fab fa-youtube"></i> [cite: 20]
             </a>
             <a href="https://www.linkedin.com/in/alejandrogramiro/" target="_blank"
-                class="hover:text-blue-500 transition">
-                <i class="fab fa-linkedin"></i>
+                class="text-3xl text-gray-500 hover:text-blue-500 transition">
+                <i class="fab fa-linkedin"></i> [cite: 68]
             </a>
         </div>
-        <p>&copy; 2026 YOIA.io | Alejandro G. Ramiro Sechi. <br> Automatización con propósito.</p>
+        <p class="text-gray-500 font-medium">&copy; 2026 YOIA.io | Alejandro G. Ramiro Sechi. </p>
+        <p class="text-gray-600 text-xs mt-2 uppercase tracking-widest">Transformando el futuro juntos en YOIA.io [cite:
+            49]</p>
     </footer>
 
 </body>
