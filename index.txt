@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html lang="es" class="scroll-smooth">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>YOIA.io | Alejandro G. Ramiro Sechi - Experto en Ecosistemas Microsoft IA</title>
+
+    <link rel="icon" type="image/png" href="./img/favicon.png">
+
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;700;900&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #0d1117;
+            color: #c9d1d9;
+        }
+
+        .text-gradient {
+            background: linear-gradient(to right, #52d1ff, #0072FF);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .btn-primary {
+            background: linear-gradient(to right, #52d1ff, #0072FF);
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 15px rgba(82, 209, 255, 0.2);
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 0 20px rgba(82, 209, 255, 0.4);
+        }
+
+        .vip-card {
+            background-color: #161b22;
+            border: 1px solid #30363d;
+            transition: all 0.3s ease;
+        }
+
+        .vip-card:hover {
+            border-color: #52d1ff;
+            transform: translateY(-5px);
+        }
+
+        .security-badge {
+            background: rgba(82, 209, 255, 0.1);
+            border: 1px solid #52d1ff;
+            color: #52d1ff;
+        }
+    </style>
+</head>
+
+<body class="bg-[#0d1117]">
+
+    <header class="sticky top-0 z-50 bg-[#0d1117]/90 backdrop-blur-md border-b border-gray-800">
+        <nav class="max-w-7xl mx-auto px-6 py-4 flex justify-between items-center">
+            <a href="#" class="text-3xl font-black tracking-tighter text-gradient">YOIA.io</a>
+            <div class="hidden md:flex space-x-8 items-center">
+                <a href="https://yoia.yzz.me/"
+                    class="hover:text-[#52d1ff] font-bold flex items-center gap-2 transition">
+                    <i class="fas fa-users text-sm"></i> FORO
+                </a>
+                <a href="#servicios" class="hover:text-blue-400 transition">Servicios</a>
+                <a href="#seguridad" class="hover:text-blue-400 transition">Seguridad</a>
+                <a href="vip.html" class="text-yellow-500 font-bold hover:text-yellow-400">ÁREA VIP</a>
+                <a href="https://calendar.app.google/FmRhrsrxmWLBsD5X6" target="_blank"
+                    class="btn-primary px-6 py-2 rounded-full text-white text-sm font-bold">RESERVA CITA</a>
+            </div>
+        </nav>
+    </header>
+
+    <section class="relative min-h-[85vh] flex items-center justify-center overflow-hidden">
+        <div class="absolute inset-0 bg-[url('./img/ia-banner.jpg')] bg-cover bg-center opacity-10"></div>
+        <div class="relative z-10 text-center px-6 max-w-5xl">
+            <h1 class="text-6xl md:text-8xl font-black text-white mb-6 leading-tight tracking-tight">
+                Escala tu Negocio. <br><span class="text-gradient">Automatiza tu Éxito.</span>
+            </h1>
+            <p class="text-xl md:text-2xl text-gray-400 mb-10">
+                Por Alejandro G. Ramiro Sechi. Implemento ecosistemas de IA empresariales bajo entornos Microsoft
+                seguros y escalables.
+            </p>
+            <div class="flex flex-col md:flex-row justify-center gap-6">
+                <a href="https://calendar.app.google/FmRhrsrxmWLBsD5X6" target="_blank"
+                    class="btn-primary px-12 py-5 rounded-full text-white font-black text-xl">
+                    Reserva una Consultoría
+                </a>
+                <a href="https://yoia.yzz.me/"
+                    class="bg-gray-800 hover:bg-gray-700 px-12 py-5 rounded-full text-white font-black text-xl transition border border-gray-700">
+                    Bóveda de Recursos
+                </a>
+            </div>
+        </div>
+    </section>
+
+    <section id="seguridad" class="py-24 bg-[#161b22] px-6">
+        <div class="max-w-5xl mx-auto text-center">
+            <div
+                class="inline-block security-badge px-4 py-1 rounded-full text-xs font-bold mb-6 uppercase tracking-widest">
+                <i class="fas fa-shield-alt mr-2"></i> Enterprise Security First
+            </div>
+            <h2 class="text-4xl font-bold text-white mb-8">IA Segura: Cero Filtraciones</h2>
+            <p class="text-gray-400 text-lg mb-12">Despliego tus automatizaciones en entornos aislados de Microsoft
+                Azure y Copilot Studio, garantizando que tus datos nunca entrenen modelos públicos.</p>
+            <div class="grid md:grid-cols-2 gap-8 text-left">
+                <div class="flex gap-4">
+                    <i class="fas fa-lock text-[#52d1ff] text-2xl mt-1"></i>
+                    <div>
+                        <h4 class="font-bold text-white mb-2">Protección de Datos Privados</h4>
+                        <p class="text-gray-400 text-sm">Configuración de DLP (Data Loss Prevention) en Power Automate
+                            para evitar fugas de información sensible.</p>
+                    </div>
+                </div>
+                <div class="flex gap-4">
+                    <i class="fas fa-user-shield text-[#52d1ff] text-2xl mt-1"></i>
+                    <div>
+                        <h4 class="font-bold text-white mb-2">Gobernanza de IA</h4>
+                        <p class="text-gray-400 text-sm">Implementación de controles de acceso y auditoría para
+                            monitorizar cada acción de tus agentes inteligentes.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <section class="py-24 px-6 max-w-7xl mx-auto">
+        <h2 class="text-4xl font-bold text-center mb-16">Casos de Éxito Microsoft Stack</h2>
+        <div class="grid md:grid-cols-3 gap-8">
+            <div class="vip-card p-8 rounded-3xl">
+                <h4 class="text-[#52d1ff] text-xs font-bold mb-4">COPILOT STUDIO</h4>
+                <p class="text-gray-300 italic mb-6">"El agente de IA resuelve el 70% de las dudas de clientes con
+                    acceso a nuestra base de conocimientos privada."</p>
+                <p class="text-sm font-bold text-white">Director de IT - Tech Services</p>
+            </div>
+            <div class="vip-card p-8 rounded-3xl">
+                <h4 class="text-[#52d1ff] text-xs font-bold mb-4">POWER AUTOMATE</h4>
+                <p class="text-gray-300 italic mb-6">"Automatizamos la facturación compleja. Ahorramos 15 horas
+                    semanales y eliminamos errores humanos."</p>
+                <p class="text-sm font-bold text-white">CFO - Logística Global</p>
+            </div>
+            <div class="vip-card p-8 rounded-3xl">
+                <h4 class="text-[#52d1ff] text-xs font-bold mb-4">ECOSISTEMAS IA</h4>
+                <p class="text-gray-300 italic mb-6">"Alejandro diseñó una arquitectura segura que conecta Copilot con
+                    nuestros datos internos sin riesgos."</p>
+                <p class="text-sm font-bold text-white">CEO - Multinacional</p>
+            </div>
+        </div>
+    </section>
+
+    <footer class="py-16 border-t border-gray-800 text-center">
+        <div class="flex justify-center space-x-10 mb-8">
+            <a href="https://www.youtube.com/@TU_CANAL" target="_blank"
+                class="text-3xl text-gray-500 hover:text-red-500 transition"><i class="fab fa-youtube"></i></a>
+            <a href="https://www.linkedin.com/in/alejandrogramiro/" target="_blank"
+                class="text-3xl text-gray-500 hover:text-blue-500 transition"><i class="fab fa-linkedin"></i></a>
+        </div>
+        <p class="text-gray-500 font-medium">&copy; 2026 YOIA.io | Alejandro G. Ramiro Sechi.</p>
+        <p class="text-gray-700 text-xs mt-2">TRANSFORMANDO EL FUTURO SEGURO EN YOIA.IO</p>
+    </footer>
+
+</body>
+
+</html>

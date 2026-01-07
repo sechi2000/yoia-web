@@ -2,166 +2,199 @@
 <html lang="es" class="scroll-smooth">
 
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>YOIA.io | Alejandro G. Ramiro Sechi - Experto en Ecosistemas Microsoft IA</title>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>YOIA.io | Automatización con IA aplicada</title>
 
-    <link rel="icon" type="image/png" href="./img/favicon.png">
-
+    <link rel="icon" type="image/png" href="./img/favicon.png" />
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;700;900&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" />
 
     <style>
         body {
             font-family: 'Inter', sans-serif;
-            background-color: #0d1117;
-            color: #c9d1d9;
+            background: #0d1117;
+            color: #c9d1d9
         }
 
         .text-gradient {
             background: linear-gradient(to right, #52d1ff, #0072FF);
             -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
+            -webkit-text-fill-color: transparent
         }
 
         .btn-primary {
             background: linear-gradient(to right, #52d1ff, #0072FF);
-            transition: all 0.3s ease;
-            box-shadow: 0 4px 15px rgba(82, 209, 255, 0.2);
+            box-shadow: 0 4px 15px rgba(82, 209, 255, .25)
         }
 
         .btn-primary:hover {
             transform: translateY(-2px);
-            box-shadow: 0 0 20px rgba(82, 209, 255, 0.4);
+            box-shadow: 0 0 25px rgba(82, 209, 255, .45)
         }
 
-        .vip-card {
-            background-color: #161b22;
-            border: 1px solid #30363d;
-            transition: all 0.3s ease;
-        }
-
-        .vip-card:hover {
-            border-color: #52d1ff;
-            transform: translateY(-5px);
-        }
-
-        .security-badge {
-            background: rgba(82, 209, 255, 0.1);
-            border: 1px solid #52d1ff;
-            color: #52d1ff;
+        .card {
+            background: #161b22;
+            border: 1px solid #30363d
         }
     </style>
 </head>
 
-<body class="bg-[#0d1117]">
+<body>
 
-    <header class="sticky top-0 z-50 bg-[#0d1117]/90 backdrop-blur-md border-b border-gray-800">
+    <!-- HEADER -->
+    <header class="sticky top-0 z-50 bg-[#0d1117]/90 backdrop-blur border-b border-gray-800">
         <nav class="max-w-7xl mx-auto px-6 py-4 flex justify-between items-center">
-            <a href="#" class="text-3xl font-black tracking-tighter text-gradient">YOIA.io</a>
-            <div class="hidden md:flex space-x-8 items-center">
+            <span class="text-3xl font-black text-gradient">YOIA.io</span>
+            <div class="flex items-center gap-6">
                 <a href="https://yoia.yzz.me/"
-                    class="hover:text-[#52d1ff] font-bold flex items-center gap-2 transition">
-                    <i class="fas fa-users text-sm"></i> FORO
-                </a>
-                <a href="#servicios" class="hover:text-blue-400 transition">Servicios</a>
-                <a href="#seguridad" class="hover:text-blue-400 transition">Seguridad</a>
-                <a href="vip.html" class="text-yellow-500 font-bold hover:text-yellow-400">ÁREA VIP</a>
-                <a href="https://calendar.app.google/FmRhrsrxmWLBsD5X6" target="_blank"
-                    class="btn-primary px-6 py-2 rounded-full text-white text-sm font-bold">RESERVA CITA</a>
+                    class="text-sm font-bold text-gray-300 hover:text-[#52d1ff] transition">Foro</a>
+                <a href="#lead" class="btn-primary px-6 py-2 rounded-full text-sm font-bold">Recibir ideas prácticas</a>
             </div>
         </nav>
     </header>
 
-    <section class="relative min-h-[85vh] flex items-center justify-center overflow-hidden">
-        <div class="absolute inset-0 bg-[url('./img/ia-banner.jpg')] bg-cover bg-center opacity-10"></div>
-        <div class="relative z-10 text-center px-6 max-w-5xl">
-            <h1 class="text-6xl md:text-8xl font-black text-white mb-6 leading-tight tracking-tight">
-                Escala tu Negocio. <br><span class="text-gradient">Automatiza tu Éxito.</span>
+    <!-- HERO -->
+    <section class="relative min-h-[90vh] flex items-center justify-center px-6">
+        <div class="text-center max-w-4xl">
+            <h1 class="text-6xl md:text-7xl font-black text-white mb-6">
+                Automatiza tareas reales con IA.<br><span class="text-gradient">Sin humo. Con resultados.</span>
             </h1>
-            <p class="text-xl md:text-2xl text-gray-400 mb-10">
-                Por Alejandro G. Ramiro Sechi. Implemento ecosistemas de IA empresariales bajo entornos Microsoft
-                seguros y escalables.
+            <p class="text-xl text-gray-400 mb-10">
+                Ayudo a <strong>empresas y autónomos</strong> a diseñar sistemas de automatización con IA para ahorrar
+                tiempo y escalar operaciones desde esta misma semana.
             </p>
-            <div class="flex flex-col md:flex-row justify-center gap-6">
-                <a href="https://calendar.app.google/FmRhrsrxmWLBsD5X6" target="_blank"
-                    class="btn-primary px-12 py-5 rounded-full text-white font-black text-xl">
-                    Reserva una Consultoría
-                </a>
-                <a href="https://yoia.yzz.me/"
-                    class="bg-gray-800 hover:bg-gray-700 px-12 py-5 rounded-full text-white font-black text-xl transition border border-gray-700">
-                    Bóveda de Recursos
-                </a>
-            </div>
+            <a href="#framework" class="btn-primary px-10 py-4 rounded-full font-black text-lg">Ver cómo funciona ↓</a>
         </div>
     </section>
 
-    <section id="seguridad" class="py-24 bg-[#161b22] px-6">
-        <div class="max-w-5xl mx-auto text-center">
-            <div
-                class="inline-block security-badge px-4 py-1 rounded-full text-xs font-bold mb-6 uppercase tracking-widest">
-                <i class="fas fa-shield-alt mr-2"></i> Enterprise Security First
-            </div>
-            <h2 class="text-4xl font-bold text-white mb-8">IA Segura: Cero Filtraciones</h2>
-            <p class="text-gray-400 text-lg mb-12">Despliego tus automatizaciones en entornos aislados de Microsoft
-                Azure y Copilot Studio, garantizando que tus datos nunca entrenen modelos públicos.</p>
-            <div class="grid md:grid-cols-2 gap-8 text-left">
-                <div class="flex gap-4">
-                    <i class="fas fa-lock text-[#52d1ff] text-2xl mt-1"></i>
-                    <div>
-                        <h4 class="font-bold text-white mb-2">Protección de Datos Privados</h4>
-                        <p class="text-gray-400 text-sm">Configuración de DLP (Data Loss Prevention) en Power Automate
-                            para evitar fugas de información sensible.</p>
-                    </div>
-                </div>
-                <div class="flex gap-4">
-                    <i class="fas fa-user-shield text-[#52d1ff] text-2xl mt-1"></i>
-                    <div>
-                        <h4 class="font-bold text-white mb-2">Gobernanza de IA</h4>
-                        <p class="text-gray-400 text-sm">Implementación de controles de acceso y auditoría para
-                            monitorizar cada acción de tus agentes inteligentes.</p>
-                    </div>
-                </div>
-            </div>
+    <!-- PROBLEMA -->
+    <section class="py-24 px-6 max-w-5xl mx-auto">
+        <h2 class="text-4xl font-bold text-white mb-8">Si estás aquí, probablemente…</h2>
+        <ul class="space-y-4 text-gray-400 text-lg">
+            <li>▪ Usas IA pero no en procesos reales</li>
+            <li>▪ Repites tareas que podrían automatizarse</li>
+            <li>▪ Has visto teoría, pero ningún sistema claro</li>
+        </ul>
+        <p class="mt-8 text-xl font-bold text-white">La IA solo sirve si está integrada en tu flujo diario.</p>
+    </section>
+
+    <!-- AUTORIDAD -->
+    <section class="py-24 bg-[#161b22] px-6">
+        <div class="max-w-4xl mx-auto text-center">
+            <h2 class="text-4xl font-bold text-white mb-6">Soy Alejandro</h2>
+            <p class="text-gray-400 text-lg">
+                Trabajo con <strong>empresas y profesionales independientes</strong> que necesitan automatizar procesos
+                reales: operaciones, soporte, contenido y gestión interna.
+                <br><br>No vendo teoría. Diseño sistemas de IA aplicados a negocio que funcionan en entornos reales.
+            </p>
         </div>
     </section>
 
-    <section class="py-24 px-6 max-w-7xl mx-auto">
-        <h2 class="text-4xl font-bold text-center mb-16">Casos de Éxito Microsoft Stack</h2>
-        <div class="grid md:grid-cols-3 gap-8">
-            <div class="vip-card p-8 rounded-3xl">
-                <h4 class="text-[#52d1ff] text-xs font-bold mb-4">COPILOT STUDIO</h4>
-                <p class="text-gray-300 italic mb-6">"El agente de IA resuelve el 70% de las dudas de clientes con
-                    acceso a nuestra base de conocimientos privada."</p>
-                <p class="text-sm font-bold text-white">Director de IT - Tech Services</p>
-            </div>
-            <div class="vip-card p-8 rounded-3xl">
-                <h4 class="text-[#52d1ff] text-xs font-bold mb-4">POWER AUTOMATE</h4>
-                <p class="text-gray-300 italic mb-6">"Automatizamos la facturación compleja. Ahorramos 15 horas
-                    semanales y eliminamos errores humanos."</p>
-                <p class="text-sm font-bold text-white">CFO - Logística Global</p>
-            </div>
-            <div class="vip-card p-8 rounded-3xl">
-                <h4 class="text-[#52d1ff] text-xs font-bold mb-4">ECOSISTEMAS IA</h4>
-                <p class="text-gray-300 italic mb-6">"Alejandro diseñó una arquitectura segura que conecta Copilot con
-                    nuestros datos internos sin riesgos."</p>
-                <p class="text-sm font-bold text-white">CEO - Multinacional</p>
-            </div>
+    <!-- FRAMEWORK -->
+    <section id="framework" class="py-24 px-6 max-w-6xl mx-auto">
+        <h2 class="text-4xl font-bold text-center mb-16">Framework YoIA</h2>
+        <div class="grid md:grid-cols-4 gap-8">
+            <div class="card p-6 rounded-xl">1️⃣ Detectar tareas repetitivas</div>
+            <div class="card p-6 rounded-xl">2️⃣ Diseñar el sistema</div>
+            <div class="card p-6 rounded-xl">3️⃣ Automatizar sin código</div>
+            <div class="card p-6 rounded-xl">4️⃣ Optimizar y escalar</div>
+        </div>
+    </section>
+
+    <!-- TOGGLES -->
+    <section class="py-24 px-6 max-w-4xl mx-auto">
+        <details class="mb-6 card p-6 rounded-xl">
+            <summary class="cursor-pointer font-bold">Ejemplo real de automatización</summary>
+            <p class="mt-4 text-gray-400">Gestión de emails + IA + Google Sheets.</p>
+        </details>
+        <details class="mb-6 card p-6 rounded-xl">
+            <summary class="cursor-pointer font-bold">Errores comunes usando IA</summary>
+            <p class="mt-4 text-gray-400">Automatizar sin proceso previo.</p>
+        </details>
+        <details class="card p-6 rounded-xl">
+            <summary class="cursor-pointer font-bold">Qué automatizaría primero</summary>
+            <p class="mt-4 text-gray-400">Todo lo que repites semanalmente.</p>
+        </details>
+    </section>
+
+    <!-- REDES -->
+    <section class="py-24 px-6 max-w-6xl mx-auto text-center">
+        <h2 class="text-3xl font-bold text-white mb-6">Aprende y conecta conmigo</h2>
+        <p class="text-gray-400 mb-10">Comparto casos reales, automatizaciones y estrategias aplicadas.</p>
+        <div class="flex justify-center gap-10 text-4xl">
+            <a href="https://www.youtube.com/@TU_CANAL" target="_blank"
+                class="text-gray-500 hover:text-red-500 transition"><i class="fab fa-youtube"></i></a>
+            <a href="https://www.linkedin.com/in/alejandrogramiro/" target="_blank"
+                class="text-gray-500 hover:text-blue-500 transition"><i class="fab fa-linkedin"></i></a>
+            <a href="https://www.instagram.com/" target="_blank" class="text-gray-500 hover:text-pink-500 transition"><i
+                    class="fab fa-instagram"></i></a>
+        </div>
+    </section>
+
+    <!-- LEAD -->
+    <section id="lead" class="py-24 bg-[#161b22] px-6">
+        <div class="max-w-xl mx-auto text-center">
+            <h2 class="text-3xl font-bold text-white mb-6">¿Quieres ideas de automatización aplicables?</h2>
+            <p class="text-gray-400 mb-8">Envío solo cosas que usaría en un proyecto real.</p>
+            <form id="leadForm" class="flex flex-col gap-4">
+                <select name="tipo" class="px-4 py-3 rounded bg-black border border-gray-700 text-gray-400" required>
+                    <option value="">Soy…</option>
+                    <option value="empresa">Empresa</option>
+                    <option value="autonomo">Autónomo / Profesional</option>
+                </select>
+                <input type="email" name="email" placeholder="Tu email profesional"
+                    class="px-4 py-3 rounded bg-black border border-gray-700" required>
+                <button type="submit" class="btn-primary py-3 rounded-full font-bold">Recibir ideas prácticas</button>
+                <p id="formMsg" class="text-sm text-gray-400 mt-2 hidden"></p>
+            </form>
         </div>
     </section>
 
     <footer class="py-16 border-t border-gray-800 text-center">
-        <div class="flex justify-center space-x-10 mb-8">
-            <a href="https://www.youtube.com/@TU_CANAL" target="_blank"
-                class="text-3xl text-gray-500 hover:text-red-500 transition"><i class="fab fa-youtube"></i></a>
-            <a href="https://www.linkedin.com/in/alejandrogramiro/" target="_blank"
-                class="text-3xl text-gray-500 hover:text-blue-500 transition"><i class="fab fa-linkedin"></i></a>
+        <div class="flex justify-center gap-10 mb-6">
+            <a href="https://yoia.yzz.me/" class="text-sm font-bold text-gray-400 hover:text-[#52d1ff]">Foro YoIA</a>
+            <a href="https://www.linkedin.com/in/alejandrogramiro/"
+                class="text-sm font-bold text-gray-400 hover:text-[#52d1ff]">LinkedIn</a>
+            <a href="https://www.youtube.com/@TU_CANAL"
+                class="text-sm font-bold text-gray-400 hover:text-[#52d1ff]">YouTube</a>
         </div>
-        <p class="text-gray-500 font-medium">&copy; 2026 YOIA.io | Alejandro G. Ramiro Sechi.</p>
-        <p class="text-gray-700 text-xs mt-2">TRANSFORMANDO EL FUTURO SEGURO EN YOIA.IO</p>
+        <p class="text-gray-500 text-sm">© 2026 YOIA.io · Automatización con IA para empresas y autónomos</p>
     </footer>
 
+    <script>
+        const form = document.getElementById('leadForm');
+        const msg = document.getElementById('formMsg');
+
+        form.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const email = form.email.value;
+            const tipo = form.tipo.value;
+
+            try {
+                const res = await fetch('https://hook.eu1.make.com/1rtl34isw6fxhv704moi2c8qah3uhrw1', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        email,
+                        tipo,
+                        source: 'yoia.io',
+                        timestamp: new Date().toISOString()
+                    })
+                });
+
+                if (res.ok) {
+                    msg.textContent = '✅ Perfecto. Revisa tu email.';
+                    msg.classList.remove('hidden');
+                    form.reset();
+                } else throw new Error();
+            } catch {
+                msg.textContent = '❌ Error al enviar. Inténtalo de nuevo.';
+                msg.classList.remove('hidden');
+            }
+        });
+    </script>
 </body>
 
 </html>
