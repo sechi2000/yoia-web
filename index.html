@@ -4,12 +4,11 @@
 <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>YOIA.io | Automatización con IA aplicada</title>
+    <title>YOIA.io | Agentes y Automatización con IA</title>
 
     <link rel="icon" type="image/png" href="./img/favicon.png" />
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;700;900&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" />
 
     <style>
         body {
@@ -38,6 +37,25 @@
             background: #161b22;
             border: 1px solid #30363d;
         }
+
+        @keyframes gradientMove {
+            0% {
+                background-position: 0% 50%
+            }
+
+            50% {
+                background-position: 100% 50%
+            }
+
+            100% {
+                background-position: 0% 50%
+            }
+        }
+
+        .animate-gradient {
+            background-size: 200% 200%;
+            animation: gradientMove 14s ease infinite;
+        }
     </style>
 </head>
 
@@ -47,92 +65,161 @@
     <header class="sticky top-0 z-50 bg-[#0d1117]/90 backdrop-blur border-b border-gray-800">
         <nav class="max-w-7xl mx-auto px-6 py-4 flex justify-between items-center">
             <span class="text-3xl font-black text-gradient">YOIA.io</span>
-            <div class="flex items-center gap-6">
-                <a href="https://yoia.yzz.me/"
-                    class="text-sm font-bold text-gray-300 hover:text-[#52d1ff] transition">Foro</a>
-                <a href="#lead" class="btn-primary px-6 py-2 rounded-full text-sm font-bold">Recibir ideas prácticas</a>
-            </div>
+            <a href="#lead" class="btn-primary px-6 py-2 rounded-full text-sm font-bold">
+                Hablar sobre mi caso
+            </a>
         </nav>
     </header>
 
     <!-- HERO -->
-    <section class="relative min-h-[90vh] flex items-center justify-center px-6">
-        <div class="text-center max-w-4xl">
+    <section class="min-h-[90vh] flex items-center justify-center px-6 text-center">
+        <div class="max-w-4xl">
             <h1 class="text-6xl md:text-7xl font-black text-white mb-6">
-                Automatiza tareas reales con IA.<br>
-                <span class="text-gradient">Sin humo. Con resultados.</span>
+                Agentes de IA y automatización real<br>
+                <span class="text-gradient">para empresas</span>
             </h1>
             <p class="text-xl text-gray-400 mb-10">
-                Ayudo a <strong>empresas y profesionales</strong> a automatizar procesos con IA de forma práctica y
-                escalable.
+                Diseño y desarrollo <strong>agentes de IA profesionales</strong>
+                integrados en entornos reales: Microsoft, OpenAI y Google.
+                Sin humo. Con seguridad.
             </p>
-            <a href="#framework" class="btn-primary px-10 py-4 rounded-full font-black text-lg">
-                Ver cómo funciona ↓
+            <a href="#stack" class="btn-primary px-10 py-4 rounded-full font-black text-lg">
+                Ver cómo trabajo ↓
             </a>
         </div>
     </section>
 
     <!-- FRAMEWORK -->
-    <section id="framework" class="py-24 px-6 max-w-6xl mx-auto">
+    <section class="py-24 px-6 max-w-6xl mx-auto">
         <h2 class="text-4xl font-bold text-center mb-16">Framework YoIA</h2>
         <div class="grid md:grid-cols-4 gap-8">
-            <div class="card p-6 rounded-xl">1️⃣ Detectar tareas repetitivas</div>
-            <div class="card p-6 rounded-xl">2️⃣ Diseñar el sistema</div>
-            <div class="card p-6 rounded-xl">3️⃣ Automatizar sin código</div>
-            <div class="card p-6 rounded-xl">4️⃣ Optimizar y escalar</div>
+            <div class="card p-6 rounded-xl">1️⃣ Detectar tareas reales</div>
+            <div class="card p-6 rounded-xl">2️⃣ Diseñar el agente IA</div>
+            <div class="card p-6 rounded-xl">3️⃣ Integrar en tu entorno</div>
+            <div class="card p-6 rounded-xl">4️⃣ Escalar con seguridad</div>
         </div>
     </section>
 
-    <!-- LEAD -->
+    <!-- STACK ENTERPRISE -->
+    <section id="stack" class="py-28 px-6 relative overflow-hidden">
+        <div
+            class="absolute inset-0 bg-gradient-to-br from-[#0a2540] via-[#0d1117] to-[#0a2540] opacity-80 animate-gradient">
+        </div>
+
+        <div class="relative max-w-7xl mx-auto">
+
+            <div class="text-center max-w-4xl mx-auto mb-20">
+                <h2 class="text-4xl md:text-5xl font-black text-white mb-6">
+                    Agentes de IA donde <span class="text-gradient">tu negocio ya vive</span>
+                </h2>
+                <p class="text-xl text-gray-400">
+                    No fuerzo herramientas. Desarrollo IA
+                    donde tu empresa ya opera.
+                </p>
+            </div>
+
+            <div class="grid md:grid-cols-4 gap-8 mb-24">
+                <div class="card backdrop-blur-xl p-8 rounded-2xl">
+                    <h3 class="text-xl font-bold text-white mb-3">🟦 Microsoft Copilot Studio</h3>
+                    <p class="text-gray-400 text-sm">
+                        Entorno recomendado. Agentes seguros integrados con
+                        Microsoft 365, Power Platform y Azure.
+                    </p>
+                    <p class="mt-4 text-sm text-[#52d1ff] font-bold">
+                        Seguridad · Compliance · Control
+                    </p>
+                </div>
+
+                <div class="card backdrop-blur-xl p-8 rounded-2xl">
+                    <h3 class="text-xl font-bold text-white mb-3">🟨 OpenAI / Azure OpenAI</h3>
+                    <p class="text-gray-400 text-sm">
+                        Modelos avanzados para agentes conversacionales,
+                        clasificación y reasoning.
+                    </p>
+                </div>
+
+                <div class="card backdrop-blur-xl p-8 rounded-2xl">
+                    <h3 class="text-xl font-bold text-white mb-3">🟥 Gemini Studio</h3>
+                    <p class="text-gray-400 text-sm">
+                        Agentes multimodales conectados al
+                        ecosistema Google.
+                    </p>
+                </div>
+
+                <div class="card backdrop-blur-xl p-8 rounded-2xl">
+                    <h3 class="text-xl font-bold text-white mb-3">⚙️ Automatización híbrida</h3>
+                    <p class="text-gray-400 text-sm">
+                        IA + workflows + sistemas internos
+                        (CRM, ERP, soporte).
+                    </p>
+                </div>
+            </div>
+
+            <div class="max-w-5xl mx-auto text-center card backdrop-blur-xl p-12 rounded-2xl">
+                <h3 class="text-3xl font-bold text-white mb-6">
+                    Seguridad primero. IA profesional.
+                </h3>
+                <p class="text-gray-400 text-lg mb-10">
+                    Recomiendo <strong>entornos Microsoft</strong>
+                    cuando la seguridad y el cumplimiento importan.
+                </p>
+                <div class="grid md:grid-cols-2 gap-6 text-left text-gray-300">
+                    <p>✔ Datos no usados para entrenar modelos públicos</p>
+                    <p>✔ Control de accesos (Entra ID)</p>
+                    <p>✔ Auditoría y trazabilidad</p>
+                    <p>✔ Cumplimiento GDPR / enterprise</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- LEAD FORM -->
     <section id="lead" class="py-24 bg-[#161b22] px-6">
         <div class="max-w-xl mx-auto text-center">
             <h2 class="text-3xl font-bold text-white mb-6">
                 ¿Hablamos sobre tu caso?
             </h2>
             <p class="text-gray-400 mb-8">
-                Te contacto según lo que necesites: email o WhatsApp.
+                Elige tu perfil y te contacto de la forma más adecuada.
             </p>
 
             <form id="leadForm" class="flex flex-col gap-4">
-
-                <select id="tipo" name="tipo" class="px-4 py-3 rounded bg-black border border-gray-700 text-gray-400"
-                    required>
+                <select id="tipo" class="px-4 py-3 rounded bg-black border border-gray-700 text-gray-400" required>
                     <option value="">Soy…</option>
                     <option value="empresa">Empresa</option>
                     <option value="autonomo">Autónomo / Profesional</option>
                     <option value="persona">Persona / Particular</option>
                 </select>
 
-                <input type="text" id="nombre" name="nombre" placeholder="Tu nombre"
+                <input id="nombre" type="text" placeholder="Tu nombre"
+                    class="px-4 py-3 rounded bg-black border border-gray-700 hidden">
+                <input id="telefono" type="tel" placeholder="Tu WhatsApp"
                     class="px-4 py-3 rounded bg-black border border-gray-700 hidden">
 
-                <input type="tel" id="telefono" name="telefono" placeholder="Tu número de WhatsApp"
-                    class="px-4 py-3 rounded bg-black border border-gray-700 hidden">
-
-                <input type="email" name="email" placeholder="Tu email"
+                <input id="email" type="email" placeholder="Tu email"
                     class="px-4 py-3 rounded bg-black border border-gray-700" required>
 
                 <button type="submit" class="btn-primary py-3 rounded-full font-bold">
                     Enviar
                 </button>
 
-                <p id="formMsg" class="text-sm text-gray-400 mt-2 hidden"></p>
+                <p id="formMsg" class="text-sm text-gray-400 hidden"></p>
             </form>
         </div>
     </section>
 
-    <footer class="py-16 border-t border-gray-800 text-center">
+    <footer class="py-12 text-center border-t border-gray-800">
         <p class="text-gray-500 text-sm">
-            © 2026 YOIA.io · Automatización con IA aplicada
+            © 2026 YOIA.io · Agentes de IA y Automatización Enterprise
         </p>
     </footer>
 
     <script>
         const form = document.getElementById('leadForm');
-        const msg = document.getElementById('formMsg');
         const tipo = document.getElementById('tipo');
         const nombre = document.getElementById('nombre');
         const telefono = document.getElementById('telefono');
+        const msg = document.getElementById('formMsg');
 
         tipo.addEventListener('change', () => {
             if (tipo.value === 'persona') {
@@ -148,39 +235,28 @@
             }
         });
 
-        form.addEventListener('submit', async (e) => {
+        form.addEventListener('submit', async e => {
             e.preventDefault();
-
             const payload = {
                 tipo: tipo.value,
-                email: form.email.value,
                 nombre: nombre.value || '',
                 telefono: telefono.value || '',
+                email: email.value,
                 source: 'yoia.io',
                 timestamp: new Date().toISOString()
             };
 
             try {
-                const res = await fetch(
-                    'https://hook.eu1.make.com/mmco0981h4s6ijuyop6cp8flwtyr5iq4',
-                    {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify(payload)
-                    }
-                );
-
-                if (res.ok) {
-                    msg.textContent = '✅ Perfecto. Te contactaremos en breve.';
-                    msg.classList.remove('hidden');
-                    form.reset();
-                    nombre.classList.add('hidden');
-                    telefono.classList.add('hidden');
-                } else {
-                    throw new Error();
-                }
+                await fetch('https://hook.eu1.make.com/mmco0981h4s6ijuyop6cp8flwtyr5iq4', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+                msg.textContent = '✅ Perfecto. Te contactaremos en breve.';
+                msg.classList.remove('hidden');
+                form.reset();
             } catch {
-                msg.textContent = '❌ Error al enviar. Inténtalo de nuevo.';
+                msg.textContent = '❌ Error al enviar.';
                 msg.classList.remove('hidden');
             }
         });

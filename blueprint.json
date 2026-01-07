@@ -1,0 +1,162 @@
+{
+  "name": "YOIA Landing - Leads & WhatsApp",
+  "flow": [
+    {
+      "id": 1,
+      "module": "gateway:CustomWebHook",
+      "version": 1,
+      "parameters": {},
+      "mapper": {},
+      "metadata": {
+        "designer": { "x": 0, "y": 0 }
+      }
+    },
+    {
+      "id": 2,
+      "module": "builtin:BasicRouter",
+      "version": 1,
+      "metadata": {
+        "designer": { "x": 300, "y": 0 }
+      },
+      "routes": [
+        {
+          "flow": [
+            {
+              "id": 3,
+              "module": "google-sheets:addRow",
+              "version": 2,
+              "filter": {
+                "name": "Empresa",
+                "conditions": [
+                  [{ "a": "{{1.tipo}}", "b": "empresa", "o": "text:equal" }]
+                ]
+              },
+              "mapper": {
+                "values": {
+                  "0": "{{1.email}}",
+                  "1": "{{1.tipo}}",
+                  "2": "{{1.source}}",
+                  "3": "{{1.timestamp}}"
+                }
+              }
+            },
+            {
+              "id": 4,
+              "module": "google-email:sendAnEmail",
+              "version": 4,
+              "mapper": {
+                "to": ["{{1.email}}"],
+                "subject": "Automatizar bien la IA marca la diferencia",
+                "contents": [
+                  {
+                    "text": "Gracias por registrarte en YoIA.\n\nTrabajo con empresas que integran IA en procesos reales.\n\n— Alejandro\nYOIA.io"
+                  }
+                ]
+              }
+            },
+            {
+              "id": 5,
+              "module": "util:FunctionSleep",
+              "version": 1,
+              "mapper": { "duration": 30 }
+            },
+            {
+              "id": 6,
+              "module": "google-email:sendAnEmail",
+              "version": 4,
+              "mapper": {
+                "to": ["{{1.email}}"],
+                "subject": "¿Vemos tu caso en 15 minutos?",
+                "contents": [
+                  {
+                    "text": "Si te parece, vemos tu caso concreto.\n\nReserva aquí:\nhttps://calendar.app.google/fYsm2BmyoHCNn6hBA\n\n— Alejandro"
+                  }
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "flow": [
+            {
+              "id": 7,
+              "module": "google-sheets:addRow",
+              "version": 2,
+              "filter": {
+                "name": "Autonomo",
+                "conditions": [
+                  [{ "a": "{{1.tipo}}", "b": "autonomo", "o": "text:equal" }]
+                ]
+              },
+              "mapper": {
+                "values": {
+                  "0": "{{1.email}}",
+                  "1": "{{1.tipo}}",
+                  "2": "{{1.source}}",
+                  "3": "{{1.timestamp}}"
+                }
+              }
+            },
+            {
+              "id": 8,
+              "module": "google-email:sendAnEmail",
+              "version": 4,
+              "mapper": {
+                "to": ["{{1.email}}"],
+                "subject": "Empieza a automatizar sin complicarte",
+                "contents": [
+                  {
+                    "text": "Gracias por unirte a YoIA.\n\nPronto te envío algo práctico.\n\n— Alejandro"
+                  }
+                ]
+              }
+            },
+            {
+              "id": 9,
+              "module": "util:FunctionSleep",
+              "version": 1,
+              "mapper": { "duration": 30 }
+            },
+            {
+              "id": 10,
+              "module": "google-email:sendAnEmail",
+              "version": 4,
+              "mapper": {
+                "to": ["{{1.email}}"],
+                "subject": "¿Hablamos 15 minutos?",
+                "contents": [
+                  {
+                    "text": "Reserva aquí cuando quieras:\nhttps://calendar.app.google/fYsm2BmyoHCNn6hBA"
+                  }
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "flow": [
+            {
+              "id": 11,
+              "module": "google-sheets:addRow",
+              "version": 2,
+              "filter": {
+                "name": "Persona",
+                "conditions": [
+                  [{ "a": "{{1.tipo}}", "b": "persona", "o": "text:equal" }]
+                ]
+              },
+              "mapper": {
+                "values": {
+                  "0": "{{1.nombre}}",
+                  "1": "{{1.telefono}}",
+                  "2": "{{1.email}}",
+                  "3": "{{1.timestamp}}"
+                }
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
