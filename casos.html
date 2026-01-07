@@ -1,10 +1,14 @@
 <!DOCTYPE html>
-<html lang="es" class="scroll-smooth">
+<html lang="es">
 
 <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Casos reales de IA aplicada | YOIA.io</title>
+
+    <meta name="description"
+        content="Casos reales de agentes de IA y automatizaciones empresariales con Microsoft Copilot Studio, OpenAI y Gemini." />
+    <link rel="canonical" href="https://yoia.io/casos.html" />
 
     <link rel="icon" type="image/png" href="./img/favicon.png" />
     <script src="https://cdn.tailwindcss.com"></script>
@@ -15,187 +19,54 @@
         body {
             font-family: 'Inter', sans-serif;
             background: #0d1117;
-            color: #c9d1d9
-        }
-
-        .text-gradient {
-            background: linear-gradient(to right, #52d1ff, #0072FF);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent
+            color: #c9d1d9;
         }
 
         .card {
             background: #161b22;
             border: 1px solid #30363d;
-            box-shadow: 0 0 40px rgba(82, 209, 255, .05)
         }
     </style>
-    <script type="application/ld+json">
-{
-  "@context": "https://schema.org",
-  "@type": "CaseStudy",
-  "name": "Agente de IA interno con Microsoft Copilot Studio",
-  "description": "Desarrollo de un agente de IA interno para una empresa con más de 200 empleados, usando Microsoft Copilot Studio, con control de acceso, seguridad y reducción de tiempos operativos.",
-  "about": {
-    "@type": "Thing",
-    "name": "Artificial Intelligence Automation"
-  },
-  "author": {
-    "@type": "Organization",
-    "name": "YOIA.io"
-  },
-  "url": "https://yoia.io/casos.html"
-}
-</script>
-
 </head>
 
 <body>
 
-    <!-- HEADER -->
     <header class="sticky top-0 z-50 bg-[#0d1117]/90 backdrop-blur border-b border-gray-800">
         <nav class="max-w-7xl mx-auto px-6 py-4 flex justify-between items-center">
             <a href="/" class="text-3xl font-black text-gradient">YOIA.io</a>
-            <a href="/#lead" class="text-sm font-bold text-[#52d1ff] hover:underline">
-                Hablar sobre mi caso
-            </a>
+            <a href="/#lead" class="text-sm font-bold text-[#52d1ff]">Hablar sobre mi caso</a>
         </nav>
     </header>
 
-    <!-- HERO -->
-    <section class="py-28 px-6 text-center">
-        <h1 class="text-5xl md:text-6xl font-black text-white mb-6">
-            Casos reales de IA aplicada a negocio
-        </h1>
+    <section class="py-24 px-6 text-center">
+        <h1 class="text-5xl font-black text-white mb-6">Casos reales de IA aplicada</h1>
         <p class="text-xl text-gray-400 max-w-3xl mx-auto">
-            Automatizaciones y agentes de IA desarrollados en entornos
-            <strong>Microsoft Copilot Studio, OpenAI y Gemini</strong>,
-            con foco en <strong>seguridad, control y ROI</strong>.
+            Resultados reales. Sistemas en producción. Sin demos.
         </p>
     </section>
 
-    <!-- CASO 1 -->
-    <section class="py-24 px-6 max-w-6xl mx-auto">
-        <div class="grid md:grid-cols-2 gap-12 items-center">
-            <div class="card p-8 rounded-xl">
-                <h2 class="text-3xl font-bold text-white mb-4">
-                    Caso 1 · Agente interno con Microsoft Copilot
-                </h2>
-                <p class="text-gray-400 mb-4">
-                    Empresa con +200 empleados necesitaba un agente IA interno
-                    para responder dudas sobre procesos, documentación y políticas.
-                </p>
-                <ul class="text-gray-400 space-y-2">
-                    <li>✔ Copilot Studio + SharePoint</li>
-                    <li>✔ Control de acceso por roles</li>
-                    <li>✔ Datos nunca salen del tenant Microsoft</li>
-                </ul>
-            </div>
-
-            <div class="card p-6 rounded-xl">
-                <canvas id="chartCopilot"></canvas>
-            </div>
+    <section class="py-24 px-6 max-w-6xl mx-auto grid md:grid-cols-2 gap-12">
+        <div class="card p-8 rounded-xl">
+            <h2 class="text-3xl font-bold text-white mb-4">Agente interno con Copilot</h2>
+            <p class="text-gray-400">Reducción del tiempo medio por consulta.</p>
         </div>
-    </section>
-
-    <!-- CASO 2 -->
-    <section class="py-24 px-6 max-w-6xl mx-auto">
-        <div class="grid md:grid-cols-2 gap-12 items-center">
-            <div class="card p-6 rounded-xl">
-                <canvas id="chartAutomation"></canvas>
-            </div>
-
-            <div class="card p-8 rounded-xl">
-                <h2 class="text-3xl font-bold text-white mb-4">
-                    Caso 2 · Automatización de operaciones con IA
-                </h2>
-                <p class="text-gray-400 mb-4">
-                    Automatización de emails, clasificación de tickets y generación
-                    de respuestas usando OpenAI + Make.
-                </p>
-                <ul class="text-gray-400 space-y-2">
-                    <li>✔ Reducción del 62% en tareas manuales</li>
-                    <li>✔ Respuesta en minutos, no horas</li>
-                    <li>✔ Sin tocar el stack existente</li>
-                </ul>
-            </div>
+        <div class="card p-6 rounded-xl">
+            <canvas id="chart1"></canvas>
         </div>
-    </section>
-
-    <!-- CASO 3 -->
-    <section class="py-24 px-6 max-w-6xl mx-auto">
-        <div class="grid md:grid-cols-2 gap-12 items-center">
-            <div class="card p-8 rounded-xl">
-                <h2 class="text-3xl font-bold text-white mb-4">
-                    Caso 3 · Leads → WhatsApp → Agenda
-                </h2>
-                <p class="text-gray-400 mb-4">
-                    Sistema completo desde la web hasta WhatsApp y Google Calendar,
-                    con mensajes personalizados y trazabilidad.
-                </p>
-                <ul class="text-gray-400 space-y-2">
-                    <li>✔ WhatsApp con mensaje prellenado</li>
-                    <li>✔ Email + seguimiento automático</li>
-                    <li>✔ Más reuniones con el mismo tráfico</li>
-                </ul>
-            </div>
-
-            <div class="card p-6 rounded-xl">
-                <canvas id="chartLeads"></canvas>
-            </div>
-        </div>
-    </section>
-
-    <!-- CTA FINAL -->
-    <section class="py-32 text-center bg-[#161b22] px-6">
-        <h2 class="text-4xl font-black text-white mb-6">
-            ¿Quieres algo así en tu empresa?
-        </h2>
-        <p class="text-gray-400 mb-10 max-w-xl mx-auto">
-            Analizamos tu caso concreto y vemos qué agentes o automatizaciones
-            tienen sentido ahora mismo.
-        </p>
-        <a href="/#lead" class="inline-block px-10 py-4 rounded-full font-black text-lg text-black"
-            style="background:linear-gradient(to right,#52d1ff,#0072FF)">
-            Hablar sobre mi caso
-        </a>
     </section>
 
     <footer class="py-16 text-center border-t border-gray-800">
-        <p class="text-gray-500 text-sm">
-            © 2026 YOIA.io · IA aplicada con seguridad y criterio empresarial
-        </p>
+        <p class="text-gray-500 text-sm">© 2026 YOIA.io</p>
     </footer>
 
     <script>
-        new Chart(document.getElementById('chartCopilot'), {
+        new Chart(document.getElementById('chart1'), {
             type: 'bar',
             data: {
                 labels: ['Antes', 'Después'],
                 datasets: [{
-                    label: 'Tiempo medio por consulta (min)',
+                    label: 'Minutos por consulta',
                     data: [15, 2]
-                }]
-            }
-        });
-
-        new Chart(document.getElementById('chartAutomation'), {
-            type: 'line',
-            data: {
-                labels: ['Semana 1', 'Semana 2', 'Semana 3', 'Semana 4'],
-                datasets: [{
-                    label: 'Tareas manuales',
-                    data: [100, 72, 48, 38]
-                }]
-            }
-        });
-
-        new Chart(document.getElementById('chartLeads'), {
-            type: 'doughnut',
-            data: {
-                labels: ['Automatizado', 'Manual'],
-                datasets: [{
-                    data: [75, 25]
                 }]
             }
         });

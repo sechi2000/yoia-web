@@ -2,18 +2,20 @@
 <html lang="es" class="scroll-smooth">
 
 <head>
+    <!-- SEO BÁSICO -->
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-
     <title>YOIA.io | Agentes de IA y Automatización Enterprise</title>
 
     <meta name="description"
         content="Diseño y desarrollo de agentes de IA y automatizaciones para empresas. Microsoft Copilot Studio, OpenAI y Gemini con foco en seguridad, control y resultados reales." />
-
     <meta name="robots" content="index, follow" />
     <link rel="canonical" href="https://yoia.io/" />
 
+    <!-- ICONO -->
     <link rel="icon" type="image/png" href="./img/favicon.png" />
+
+    <!-- FUENTES Y CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;700;900&display=swap" rel="stylesheet">
 
@@ -21,32 +23,32 @@
         body {
             font-family: 'Inter', sans-serif;
             background: #0d1117;
-            color: #c9d1d9
+            color: #c9d1d9;
         }
 
         .text-gradient {
             background: linear-gradient(to right, #52d1ff, #0072FF);
             -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent
+            -webkit-text-fill-color: transparent;
         }
 
         .btn-primary {
             background: linear-gradient(to right, #52d1ff, #0072FF);
-            box-shadow: 0 4px 15px rgba(82, 209, 255, .25)
+            box-shadow: 0 4px 15px rgba(82, 209, 255, .25);
         }
 
         .btn-primary:hover {
             transform: translateY(-2px);
-            box-shadow: 0 0 25px rgba(82, 209, 255, .45)
+            box-shadow: 0 0 25px rgba(82, 209, 255, .45);
         }
 
         .card {
             background: #161b22;
-            border: 1px solid #30363d
+            border: 1px solid #30363d;
         }
     </style>
 
-    <!-- ORGANIZATION -->
+    <!-- SCHEMA ORGANIZATION (CORRECTO) -->
     <script type="application/ld+json">
   {
     "@context": "https://schema.org",
@@ -54,45 +56,32 @@
     "name": "YOIA.io",
     "url": "https://yoia.io",
     "logo": "https://yoia.io/img/favicon.png",
-    "description": "Agentes de IA y automatización enterprise para empresas. Microsoft Copilot Studio, OpenAI y Gemini.",
-    "sameAs": ["https://www.linkedin.com/in/alejandrogramiro/"]
-  }
-  </script>
-
-    <!-- SERVICE (CORRECTO PARA B2B) -->
-    <script type="application/ld+json">
-  {
-    "@context": "https://schema.org",
-    "@type": "Service",
-    "name": "Agentes de IA y Automatización Enterprise",
-    "provider": {
-      "@type": "Organization",
-      "name": "YOIA.io",
-      "url": "https://yoia.io"
-    },
-    "serviceType": "Artificial Intelligence Automation",
-    "areaServed": {
-      "@type": "Country",
-      "name": "ES"
-    },
-    "description": "Diseño y desarrollo de agentes de IA y automatizaciones profesionales en entornos Microsoft Copilot Studio, OpenAI y Gemini, con foco en seguridad y control empresarial.",
-    "url": "https://yoia.io"
+    "description": "Agentes de IA y automatización enterprise para empresas",
+    "sameAs": [
+      "https://www.linkedin.com/in/alejandrogramiro/"
+    ]
   }
   </script>
 </head>
 
 <body>
 
+    <!-- HEADER -->
     <header class="sticky top-0 z-50 bg-[#0d1117]/90 backdrop-blur border-b border-gray-800">
         <nav class="max-w-7xl mx-auto px-6 py-4 flex justify-between items-center">
             <span class="text-3xl font-black text-gradient">YOIA.io</span>
             <div class="flex items-center gap-6">
-                <a href="/casos.html" class="text-sm font-bold text-gray-300 hover:text-[#52d1ff]">Casos reales</a>
-                <a href="#lead" class="btn-primary px-6 py-2 rounded-full text-sm font-bold">Hablar sobre mi caso</a>
+                <a href="/casos.html" class="text-sm font-bold text-gray-300 hover:text-[#52d1ff]">
+                    Casos reales
+                </a>
+                <a href="#lead" class="btn-primary px-6 py-2 rounded-full text-sm font-bold">
+                    Hablar sobre mi caso
+                </a>
             </div>
         </nav>
     </header>
 
+    <!-- HERO -->
     <section class="min-h-[90vh] flex items-center justify-center px-6 text-center">
         <div class="max-w-4xl">
             <h1 class="text-6xl md:text-7xl font-black text-white mb-6">
@@ -100,34 +89,50 @@
                 <span class="text-gradient">para empresas</span>
             </h1>
             <p class="text-xl text-gray-400 mb-10">
-                Desarrollo agentes de IA profesionales integrados en entornos
-                Microsoft, OpenAI y Google. Sin humo. Con seguridad.
+                Diseño agentes de IA profesionales integrados en entornos
+                <strong>Microsoft Copilot Studio, OpenAI y Gemini</strong>.
+                Sin humo. Con seguridad.
             </p>
+
             <div class="flex justify-center gap-6 flex-wrap">
-                <a href="#stack" class="btn-primary px-10 py-4 rounded-full font-black text-lg">Ver cómo trabajo ↓</a>
+                <a href="#lead" class="btn-primary px-10 py-4 rounded-full font-black text-lg">
+                    Analizar mi caso ↓
+                </a>
                 <a href="/casos.html"
                     class="px-10 py-4 rounded-full font-bold border border-gray-600 hover:border-[#52d1ff]">
                     Ver casos reales →
                 </a>
             </div>
+
+            <p class="text-sm text-gray-500 mt-6">
+                ✔ Casos reales · ✔ Seguridad enterprise · ✔ IA aplicada de verdad
+            </p>
         </div>
     </section>
 
-    <section id="stack" class="py-28 px-6 max-w-7xl mx-auto">
-        <h2 class="text-4xl font-black text-center mb-16">Stack recomendado</h2>
+    <!-- FRAMEWORK -->
+    <section class="py-24 px-6 max-w-6xl mx-auto">
+        <h2 class="text-4xl font-bold text-center mb-16">Framework YoIA</h2>
         <div class="grid md:grid-cols-4 gap-8">
-            <div class="card p-8 rounded-xl">🟦 Microsoft Copilot Studio<br><span
-                    class="text-sm text-gray-400">Seguridad · Control</span></div>
-            <div class="card p-8 rounded-xl">🟨 Azure OpenAI / OpenAI</div>
-            <div class="card p-8 rounded-xl">🟥 Gemini Studio</div>
-            <div class="card p-8 rounded-xl">⚙️ Automatización híbrida</div>
+            <div class="card p-6 rounded-xl">1️⃣ Detectar tareas reales</div>
+            <div class="card p-6 rounded-xl">2️⃣ Diseñar el agente IA</div>
+            <div class="card p-6 rounded-xl">3️⃣ Integrarlo en tu entorno</div>
+            <div class="card p-6 rounded-xl">4️⃣ Escalar con seguridad</div>
+        </div>
+
+        <div class="text-center mt-12">
+            <a href="/casos.html" class="text-sm font-bold text-[#52d1ff] hover:underline">
+                Ver casos reales →
+            </a>
         </div>
     </section>
 
+    <!-- FORMULARIO -->
     <section id="lead" class="py-24 bg-[#161b22] px-6">
         <div class="max-w-xl mx-auto text-center">
             <h2 class="text-3xl font-bold text-white mb-6">¿Hablamos de tu caso?</h2>
-            <p class="text-gray-400 mb-8">Cuéntame qué necesitas y vemos si tiene sentido automatizarlo.</p>
+            <p class="text-gray-400 mb-8">Selecciona tu perfil y seguimos.</p>
+
             <form id="leadForm" class="flex flex-col gap-4">
                 <select id="tipo" class="px-4 py-3 rounded bg-black border border-gray-700 text-gray-400" required>
                     <option value="">Soy…</option>
@@ -135,25 +140,76 @@
                     <option value="autonomo">Autónomo</option>
                     <option value="persona">Persona</option>
                 </select>
-                <input id="nombre" class="px-4 py-3 rounded bg-black border border-gray-700 hidden"
-                    placeholder="Tu nombre">
-                <input id="telefono" class="px-4 py-3 rounded bg-black border border-gray-700 hidden"
-                    placeholder="Tu WhatsApp">
-                <input id="email" type="email" required class="px-4 py-3 rounded bg-black border border-gray-700"
-                    placeholder="Tu email">
-                <button class="btn-primary py-3 rounded-full font-bold">Enviar</button>
+
+                <input id="nombre" type="text" placeholder="Tu nombre"
+                    class="px-4 py-3 rounded bg-black border border-gray-700 hidden">
+                <input id="telefono" type="tel" placeholder="Tu WhatsApp"
+                    class="px-4 py-3 rounded bg-black border border-gray-700 hidden">
+
+                <input id="email" type="email" placeholder="Tu email"
+                    class="px-4 py-3 rounded bg-black border border-gray-700" required>
+
+                <button type="submit" class="btn-primary py-3 rounded-full font-bold">
+                    Enviar
+                </button>
+
                 <p id="formMsg" class="text-sm text-gray-400 hidden"></p>
             </form>
         </div>
     </section>
 
     <footer class="py-12 text-center border-t border-gray-800">
-        <div class="flex justify-center gap-8 mb-4 text-sm">
-            <a href="/casos.html" class="text-gray-400 hover:text-[#52d1ff]">Casos reales</a>
-            <a href="/#lead" class="text-gray-400 hover:text-[#52d1ff]">Contacto</a>
-        </div>
-        <p class="text-gray-500 text-sm">© 2026 YOIA.io · Agentes de IA y Automatización Enterprise</p>
+        <p class="text-gray-500 text-sm">© 2026 YOIA.io</p>
     </footer>
+
+    <script>
+        const tipo = document.getElementById('tipo');
+        const nombre = document.getElementById('nombre');
+        const telefono = document.getElementById('telefono');
+        const msg = document.getElementById('formMsg');
+        const form = document.getElementById('leadForm');
+
+        tipo.addEventListener('change', () => {
+            if (tipo.value === 'persona') {
+                nombre.classList.remove('hidden');
+                telefono.classList.remove('hidden');
+                nombre.required = true;
+                telefono.required = true;
+            } else {
+                nombre.classList.add('hidden');
+                telefono.classList.add('hidden');
+                nombre.required = false;
+                telefono.required = false;
+            }
+        });
+
+        form.addEventListener('submit', async e => {
+            e.preventDefault();
+
+            const payload = {
+                tipo: tipo.value,
+                nombre: nombre.value || '',
+                telefono: telefono.value || '',
+                email: email.value,
+                source: 'yoia.io',
+                timestamp: new Date().toISOString()
+            };
+
+            try {
+                await fetch('https://hook.eu1.make.com/mmco0981h4s6ijuyop6cp8flwtyr5iq4', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+                msg.textContent = '✅ Gracias. Te contactaré en breve.';
+                msg.classList.remove('hidden');
+                form.reset();
+            } catch {
+                msg.textContent = '❌ Error al enviar.';
+                msg.classList.remove('hidden');
+            }
+        });
+    </script>
 
 </body>
 
