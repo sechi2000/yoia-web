@@ -7,180 +7,185 @@
     <title>YOIA.io | Automatización con IA aplicada</title>
 
     <link rel="icon" type="image/png" href="./img/favicon.png" />
-    <script src="https://cdn.tailwindcss.com">  const tipoSelect = document.getElementById('tipo');
-        const nombreInput = document.getElementById('nombre');
-        const telefonoInput = document.getElementById('telefono');
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;700;900&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" />
 
-        tipoSelect.addEventListener('change', () => {
-            if (tipoSelect.value === 'persona') {
-                nombreInput.classList.remove('hidden');
-                telefonoInput.classList.remove('hidden');
-                nombreInput.required = true;
-                telefonoInput.required = true;
-            } else {
-                nombreInput.classList.add('hidden');
-                telefonoInput.classList.add('hidden');
-                nombreInput.required = false;
-                telefonoInput.required = false;
-            }
-        });
-</
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;700;900&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" />
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background: #0d1117;
+            color: #c9d1d9;
+        }
 
-  <style>
-    body { font-family: 'Inter', sans-serif; background:#0d1117; color:#c9d1d9 }
-    .text-gradient{background:linear-gradient(to right,#52d1ff,#0072FF);-webkit-background-clip:text;-webkit-text-fill-color:transparent}
-    .btn-primary{background:linear-gradient(to right,#52d1ff,#0072FF);box-shadow:0 4px 15px rgba(82,209,255,.25)}
-    .btn-primary:hover{transform:translateY(-2px);box-shadow:0 0 25px rgba(82,209,255,.45)}
-    .card{background:#161b22;border:1px solid #30363d}
-  </style>
+        .text-gradient {
+            background: linear-gradient(to right, #52d1ff, #0072FF);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .btn-primary {
+            background: linear-gradient(to right, #52d1ff, #0072FF);
+            box-shadow: 0 4px 15px rgba(82, 209, 255, .25);
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 0 25px rgba(82, 209, 255, .45);
+        }
+
+        .card {
+            background: #161b22;
+            border: 1px solid #30363d;
+        }
+    </style>
 </head>
 
 <body>
 
-<!-- HEADER -->
-<header class="sticky top-0 z-50 bg-[#0d1117]/90 backdrop-blur border-b border-gray-800">
-  <nav class="max-w-7xl mx-auto px-6 py-4 flex justify-between items-center">
-    <span class="text-3xl font-black text-gradient">YOIA.io</span>
-    <div class="flex items-center gap-6">
-      <a href="https://yoia.yzz.me/" class="text-sm font-bold text-gray-300 hover:text-[#52d1ff] transition">Foro</a>
-      <a href="#lead" class="btn-primary px-6 py-2 rounded-full text-sm font-bold">Recibir ideas prácticas</a>
-    </div>
-  </nav>
-</header>
+    <!-- HEADER -->
+    <header class="sticky top-0 z-50 bg-[#0d1117]/90 backdrop-blur border-b border-gray-800">
+        <nav class="max-w-7xl mx-auto px-6 py-4 flex justify-between items-center">
+            <span class="text-3xl font-black text-gradient">YOIA.io</span>
+            <div class="flex items-center gap-6">
+                <a href="https://yoia.yzz.me/"
+                    class="text-sm font-bold text-gray-300 hover:text-[#52d1ff] transition">Foro</a>
+                <a href="#lead" class="btn-primary px-6 py-2 rounded-full text-sm font-bold">Recibir ideas prácticas</a>
+            </div>
+        </nav>
+    </header>
 
-<!-- HERO -->
-<section class="relative min-h-[90vh] flex items-center justify-center px-6">
-  <div class="text-center max-w-4xl">
-    <h1 class="text-6xl md:text-7xl font-black text-white mb-6">
-      Automatiza tareas reales con IA.<br><span class="text-gradient">Sin humo. Con resultados.</span>
-    </h1>
-    <p class="text-xl text-gray-400 mb-10">
-      Ayudo a <strong>empresas y autónomos</strong> a diseñar sistemas de automatización con IA para ahorrar tiempo y escalar operaciones desde esta misma semana.
-    </p>
-    <a href="#framework" class="btn-primary px-10 py-4 rounded-full font-black text-lg">Ver cómo funciona ↓</a>
-  </div>
-</section>
+    <!-- HERO -->
+    <section class="relative min-h-[90vh] flex items-center justify-center px-6">
+        <div class="text-center max-w-4xl">
+            <h1 class="text-6xl md:text-7xl font-black text-white mb-6">
+                Automatiza tareas reales con IA.<br>
+                <span class="text-gradient">Sin humo. Con resultados.</span>
+            </h1>
+            <p class="text-xl text-gray-400 mb-10">
+                Ayudo a <strong>empresas y profesionales</strong> a automatizar procesos con IA de forma práctica y
+                escalable.
+            </p>
+            <a href="#framework" class="btn-primary px-10 py-4 rounded-full font-black text-lg">
+                Ver cómo funciona ↓
+            </a>
+        </div>
+    </section>
 
-<!-- PROBLEMA -->
-<section class="py-24 px-6 max-w-5xl mx-auto">
-  <h2 class="text-4xl font-bold text-white mb-8">Si estás aquí, probablemente…</h2>
-  <ul class="space-y-4 text-gray-400 text-lg">
-    <li>▪ Usas IA pero no en procesos reales</li>
-    <li>▪ Repites tareas que podrían automatizarse</li>
-    <li>▪ Has visto teoría, pero ningún sistema claro</li>
-  </ul>
-  <p class="mt-8 text-xl font-bold text-white">La IA solo sirve si está integrada en tu flujo diario.</p>
-</section>
+    <!-- FRAMEWORK -->
+    <section id="framework" class="py-24 px-6 max-w-6xl mx-auto">
+        <h2 class="text-4xl font-bold text-center mb-16">Framework YoIA</h2>
+        <div class="grid md:grid-cols-4 gap-8">
+            <div class="card p-6 rounded-xl">1️⃣ Detectar tareas repetitivas</div>
+            <div class="card p-6 rounded-xl">2️⃣ Diseñar el sistema</div>
+            <div class="card p-6 rounded-xl">3️⃣ Automatizar sin código</div>
+            <div class="card p-6 rounded-xl">4️⃣ Optimizar y escalar</div>
+        </div>
+    </section>
 
-<!-- AUTORIDAD -->
-<section class="py-24 bg-[#161b22] px-6">
-  <div class="max-w-4xl mx-auto text-center">
-    <h2 class="text-4xl font-bold text-white mb-6">Soy Alejandro</h2>
-    <p class="text-gray-400 text-lg">
-      Trabajo con <strong>empresas y profesionales independientes</strong> que necesitan automatizar procesos reales: operaciones, soporte, contenido y gestión interna.
-      <br><br>No vendo teoría. Diseño sistemas de IA aplicados a negocio que funcionan en entornos reales.
-    </p>
-  </div>
-</section>
+    <!-- LEAD -->
+    <section id="lead" class="py-24 bg-[#161b22] px-6">
+        <div class="max-w-xl mx-auto text-center">
+            <h2 class="text-3xl font-bold text-white mb-6">
+                ¿Hablamos sobre tu caso?
+            </h2>
+            <p class="text-gray-400 mb-8">
+                Te contacto según lo que necesites: email o WhatsApp.
+            </p>
 
-<!-- FRAMEWORK -->
-<section id="framework" class="py-24 px-6 max-w-6xl mx-auto">
-  <h2 class="text-4xl font-bold text-center mb-16">Framework YoIA</h2>
-  <div class="grid md:grid-cols-4 gap-8">
-    <div class="card p-6 rounded-xl">1️⃣ Detectar tareas repetitivas</div>
-    <div class="card p-6 rounded-xl">2️⃣ Diseñar el sistema</div>
-    <div class="card p-6 rounded-xl">3️⃣ Automatizar sin código</div>
-    <div class="card p-6 rounded-xl">4️⃣ Optimizar y escalar</div>
-  </div>
-</section>
+            <form id="leadForm" class="flex flex-col gap-4">
 
-<!-- TOGGLES -->
-<section class="py-24 px-6 max-w-4xl mx-auto">
-  <details class="mb-6 card p-6 rounded-xl"><summary class="cursor-pointer font-bold">Ejemplo real de automatización</summary><p class="mt-4 text-gray-400">Gestión de emails + IA + Google Sheets.</p></details>
-  <details class="mb-6 card p-6 rounded-xl"><summary class="cursor-pointer font-bold">Errores comunes usando IA</summary><p class="mt-4 text-gray-400">Automatizar sin proceso previo.</p></details>
-  <details class="card p-6 rounded-xl"><summary class="cursor-pointer font-bold">Qué automatizaría primero</summary><p class="mt-4 text-gray-400">Todo lo que repites semanalmente.</p></details>
-</section>
+                <select id="tipo" name="tipo" class="px-4 py-3 rounded bg-black border border-gray-700 text-gray-400"
+                    required>
+                    <option value="">Soy…</option>
+                    <option value="empresa">Empresa</option>
+                    <option value="autonomo">Autónomo / Profesional</option>
+                    <option value="persona">Persona / Particular</option>
+                </select>
 
-<!-- REDES -->
-<section class="py-24 px-6 max-w-6xl mx-auto text-center">
-  <h2 class="text-3xl font-bold text-white mb-6">Aprende y conecta conmigo</h2>
-  <p class="text-gray-400 mb-10">Comparto casos reales, automatizaciones y estrategias aplicadas.</p>
-  <div class="flex justify-center gap-10 text-4xl">
-    <a href="https://www.youtube.com/@TU_CANAL" target="_blank" class="text-gray-500 hover:text-red-500 transition"><i class="fab fa-youtube"></i></a>
-    <a href="https://www.linkedin.com/in/alejandrogramiro/" target="_blank" class="text-gray-500 hover:text-blue-500 transition"><i class="fab fa-linkedin"></i></a>
-    <a href="https://www.instagram.com/" target="_blank" class="text-gray-500 hover:text-pink-500 transition"><i class="fab fa-instagram"></i></a>
-  </div>
-</section>
+                <input type="text" id="nombre" name="nombre" placeholder="Tu nombre"
+                    class="px-4 py-3 rounded bg-black border border-gray-700 hidden">
 
-<!-- LEAD -->
-<section id="lead" class="py-24 bg-[#161b22] px-6">
-  <div class="max-w-xl mx-auto text-center">
-    <h2 class="text-3xl font-bold text-white mb-6">¿Quieres ideas de automatización aplicables?</h2>
-    <p class="text-gray-400 mb-8">Envío solo cosas que usaría en un proyecto real.</p>
-    <form id="leadForm" class="flex flex-col gap-4">
-      <select name="tipo" id="tipo" class="px-4 py-3 rounded bg-black border border-gray-700 text-gray-400" required>
-        <option value="">Soy…</option>
-        <option value="empresa">Empresa</option>
-        <option value="autonomo">Autónomo / Profesional</option>
-        <option value="persona">Persona / Particular</option>
-      </select>
-      <input type="text" name="nombre" id="nombre" placeholder="Tu nombre" class="px-4 py-3 rounded bg-black border border-gray-700 hidden">
-      <input type="tel" name="telefono" id="telefono" placeholder="Tu número de WhatsApp" class="px-4 py-3 rounded bg-black border border-gray-700 hidden">
-      <input type="email" name="email" placeholder="Tu email profesional" class="px-4 py-3 rounded bg-black border border-gray-700" required>
-      <button type="submit" class="btn-primary py-3 rounded-full font-bold">Recibir ideas prácticas</button>
-      <p id="formMsg" class="text-sm text-gray-400 mt-2 hidden"></p>
-    </form>
-  </div>
-</section>
+                <input type="tel" id="telefono" name="telefono" placeholder="Tu número de WhatsApp"
+                    class="px-4 py-3 rounded bg-black border border-gray-700 hidden">
 
-<footer class="py-16 border-t border-gray-800 text-center">
-  <div class="flex justify-center gap-10 mb-6">
-    <a href="https://yoia.yzz.me/" class="text-sm font-bold text-gray-400 hover:text-[#52d1ff]">Foro YoIA</a>
-    <a href="https://www.linkedin.com/in/alejandrogramiro/" class="text-sm font-bold text-gray-400 hover:text-[#52d1ff]">LinkedIn</a>
-    <a href="https://www.youtube.com/@TU_CANAL" class="text-sm font-bold text-gray-400 hover:text-[#52d1ff]">YouTube</a>
-  </div>
-  <p class="text-gray-500 text-sm">© 2026 YOIA.io · Automatización con IA para empresas y autónomos</p>
-</footer>
+                <input type="email" name="email" placeholder="Tu email"
+                    class="px-4 py-3 rounded bg-black border border-gray-700" required>
 
-<script>
-const form = document.getElementById('leadForm');
-const msg = document.getElementById('formMsg');
+                <button type="submit" class="btn-primary py-3 rounded-full font-bold">
+                    Enviar
+                </button>
 
-form.addEventListener('submit', async (e) => {
-  e.preventDefault();
-  const email = form.email.value;
-  const nombre = form.nombre.value;
-  const telefono = form.telefono.value;
-  const tipo = form.tipo.value;
+                <p id="formMsg" class="text-sm text-gray-400 mt-2 hidden"></p>
+            </form>
+        </div>
+    </section>
 
-  try {
-    const res = await fetch('https://hook.eu1.make.com/mmco0981h4s6ijuyop6cp8flwtyr5iq4', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        email,
-        nombre,
-        telefono,
-        tipo,
-        source: 'yoia.io',
-        timestamp: new Date().toISOString()
-      }).toISOString()
-      })
-    });
+    <footer class="py-16 border-t border-gray-800 text-center">
+        <p class="text-gray-500 text-sm">
+            © 2026 YOIA.io · Automatización con IA aplicada
+        </p>
+    </footer>
 
-    if (res.ok) {
-      msg.textContent = '✅ Perfecto. Revisa tu email.';
-      msg.classList.remove('hidden');
-      form.reset();
-    } else throw new Error();
-  } catch {
-    msg.textContent = '❌ Error al enviar. Inténtalo de nuevo.';
-    msg.classList.remove('hidden');
-  }
-});
+    <script>
+        const form = document.getElementById('leadForm');
+        const msg = document.getElementById('formMsg');
+        const tipo = document.getElementById('tipo');
+        const nombre = document.getElementById('nombre');
+        const telefono = document.getElementById('telefono');
+
+        tipo.addEventListener('change', () => {
+            if (tipo.value === 'persona') {
+                nombre.classList.remove('hidden');
+                telefono.classList.remove('hidden');
+                nombre.required = true;
+                telefono.required = true;
+            } else {
+                nombre.classList.add('hidden');
+                telefono.classList.add('hidden');
+                nombre.required = false;
+                telefono.required = false;
+            }
+        });
+
+        form.addEventListener('submit', async (e) => {
+            e.preventDefault();
+
+            const payload = {
+                tipo: tipo.value,
+                email: form.email.value,
+                nombre: nombre.value || '',
+                telefono: telefono.value || '',
+                source: 'yoia.io',
+                timestamp: new Date().toISOString()
+            };
+
+            try {
+                const res = await fetch(
+                    'https://hook.eu1.make.com/mmco0981h4s6ijuyop6cp8flwtyr5iq4',
+                    {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(payload)
+                    }
+                );
+
+                if (res.ok) {
+                    msg.textContent = '✅ Perfecto. Te contactaremos en breve.';
+                    msg.classList.remove('hidden');
+                    form.reset();
+                    nombre.classList.add('hidden');
+                    telefono.classList.add('hidden');
+                } else {
+                    throw new Error();
+                }
+            } catch {
+                msg.textContent = '❌ Error al enviar. Inténtalo de nuevo.';
+                msg.classList.remove('hidden');
+            }
+        });
     </script>
-    </body>
+
+</body>
 
 </html>
