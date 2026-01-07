@@ -2,7 +2,7 @@
 <html lang="es" class="scroll-smooth">
 
 <head>
-    <!-- SEO BÁSICO -->
+    <!-- SEO -->
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>YOIA.io | Agentes de IA y Automatización Enterprise</title>
@@ -15,7 +15,7 @@
     <!-- ICONO -->
     <link rel="icon" type="image/png" href="./img/favicon.png" />
 
-    <!-- FUENTES Y CSS -->
+    <!-- CSS / FUENTES -->
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;700;900&display=swap" rel="stylesheet">
 
@@ -48,7 +48,7 @@
         }
     </style>
 
-    <!-- SCHEMA ORGANIZATION (CORRECTO) -->
+    <!-- SCHEMA ORGANIZATION -->
     <script type="application/ld+json">
   {
     "@context": "https://schema.org",
@@ -57,9 +57,28 @@
     "url": "https://yoia.io",
     "logo": "https://yoia.io/img/favicon.png",
     "description": "Agentes de IA y automatización enterprise para empresas",
-    "sameAs": [
-      "https://www.linkedin.com/in/alejandrogramiro/"
-    ]
+    "sameAs": ["https://www.linkedin.com/in/alejandrogramiro/"]
+  }
+  </script>
+
+    <!-- SCHEMA SERVICE -->
+    <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "Service",
+    "name": "Agentes de IA y Automatización Enterprise",
+    "provider": {
+      "@type": "Organization",
+      "name": "YOIA.io",
+      "url": "https://yoia.io"
+    },
+    "serviceType": "Artificial Intelligence Automation",
+    "description": "Diseño y desarrollo de agentes de IA y automatizaciones profesionales en Microsoft Copilot Studio, OpenAI y Gemini con foco en seguridad y control empresarial.",
+    "areaServed": {
+      "@type": "Country",
+      "name": "ES"
+    },
+    "url": "https://yoia.io"
   }
   </script>
 </head>
@@ -70,10 +89,17 @@
     <header class="sticky top-0 z-50 bg-[#0d1117]/90 backdrop-blur border-b border-gray-800">
         <nav class="max-w-7xl mx-auto px-6 py-4 flex justify-between items-center">
             <span class="text-3xl font-black text-gradient">YOIA.io</span>
+
             <div class="flex items-center gap-6">
-                <a href="/casos.html" class="text-sm font-bold text-gray-300 hover:text-[#52d1ff]">
+                <a href="/casos.html" class="text-sm font-bold text-gray-300 hover:text-[#52d1ff] transition">
                     Casos reales
                 </a>
+
+                <a href="https://yoia.yzz.me/" target="_blank"
+                    class="text-sm font-bold text-gray-300 hover:text-[#52d1ff] transition">
+                    Foro
+                </a>
+
                 <a href="#lead" class="btn-primary px-6 py-2 rounded-full text-sm font-bold">
                     Hablar sobre mi caso
                 </a>
@@ -88,8 +114,9 @@
                 Agentes de IA y automatización real<br>
                 <span class="text-gradient">para empresas</span>
             </h1>
+
             <p class="text-xl text-gray-400 mb-10">
-                Diseño agentes de IA profesionales integrados en entornos
+                Diseño agentes de IA profesionales integrados en
                 <strong>Microsoft Copilot Studio, OpenAI y Gemini</strong>.
                 Sin humo. Con seguridad.
             </p>
@@ -98,6 +125,7 @@
                 <a href="#lead" class="btn-primary px-10 py-4 rounded-full font-black text-lg">
                     Analizar mi caso ↓
                 </a>
+
                 <a href="/casos.html"
                     class="px-10 py-4 rounded-full font-bold border border-gray-600 hover:border-[#52d1ff]">
                     Ver casos reales →
@@ -127,11 +155,31 @@
         </div>
     </section>
 
+    <!-- BLOQUE FORO -->
+    <section class="py-20 px-6 text-center">
+        <div class="max-w-3xl mx-auto card p-10 rounded-2xl">
+            <h3 class="text-2xl font-bold text-white mb-4">
+                Comunidad YOIA
+            </h3>
+            <p class="text-gray-400 mb-8">
+                En el foro comparto automatizaciones reales, decisiones técnicas
+                y aprendizajes que no publico en la web.
+            </p>
+            <a href="https://yoia.yzz.me/" target="_blank" class="btn-primary px-8 py-3 rounded-full font-bold">
+                Acceder al foro →
+            </a>
+        </div>
+    </section>
+
     <!-- FORMULARIO -->
     <section id="lead" class="py-24 bg-[#161b22] px-6">
         <div class="max-w-xl mx-auto text-center">
-            <h2 class="text-3xl font-bold text-white mb-6">¿Hablamos de tu caso?</h2>
-            <p class="text-gray-400 mb-8">Selecciona tu perfil y seguimos.</p>
+            <h2 class="text-3xl font-bold text-white mb-6">
+                ¿Hablamos de tu caso?
+            </h2>
+            <p class="text-gray-400 mb-8">
+                Selecciona tu perfil y seguimos.
+            </p>
 
             <form id="leadForm" class="flex flex-col gap-4">
                 <select id="tipo" class="px-4 py-3 rounded bg-black border border-gray-700 text-gray-400" required>
@@ -158,10 +206,20 @@
         </div>
     </section>
 
+    <!-- FOOTER -->
     <footer class="py-12 text-center border-t border-gray-800">
+        <div class="flex justify-center gap-8 mb-4 text-sm">
+            <a href="/casos.html" class="text-gray-400 hover:text-[#52d1ff]">
+                Casos reales
+            </a>
+            <a href="https://yoia.yzz.me/" target="_blank" class="text-gray-400 hover:text-[#52d1ff]">
+                Foro
+            </a>
+        </div>
         <p class="text-gray-500 text-sm">© 2026 YOIA.io</p>
     </footer>
 
+    <!-- JS FORMULARIO -->
     <script>
         const tipo = document.getElementById('tipo');
         const nombre = document.getElementById('nombre');
@@ -201,7 +259,16 @@
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify(payload)
                 });
-                msg.textContent = '✅ Gracias. Te contactaré en breve.';
+
+                msg.innerHTML = `
+      ✅ Gracias.<br><br>
+      Si quieres profundizar más, puedes acceder al foro de YOIA:
+      <br><br>
+      <a href="https://yoia.yzz.me/" target="_blank"
+         class="underline text-[#52d1ff] font-bold">
+        Acceder al foro →
+      </a>
+    `;
                 msg.classList.remove('hidden');
                 form.reset();
             } catch {
