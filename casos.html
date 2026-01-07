@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html lang="es" class="scroll-smooth">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>YOIA.io | Casos reales de IA aplicada</title>
+
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;700;900&display=swap" rel="stylesheet">
+
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background: #0d1117;
+            color: #c9d1d9;
+        }
+
+        .card {
+            background: #161b22;
+            border: 1px solid #30363d;
+        }
+
+        .bar {
+            height: 14px;
+            border-radius: 999px;
+            background: linear-gradient(to right, #52d1ff, #0072FF);
+            width: 0;
+            transition: width 1.4s ease;
+        }
+    </style>
+</head>
+
+<body>
+
+    <!-- HEADER -->
+    <header class="sticky top-0 z-50 bg-[#0d1117]/90 backdrop-blur border-b border-gray-800">
+        <nav class="max-w-7xl mx-auto px-6 py-4 flex justify-between items-center">
+            <a href="/" class="text-2xl font-black text-white">YOIA.io</a>
+            <a href="/#lead" class="text-sm font-bold text-[#52d1ff]">Hablar sobre mi caso</a>
+        </nav>
+    </header>
+
+    <!-- HERO -->
+    <section class="py-24 px-6 text-center">
+        <h1 class="text-5xl md:text-6xl font-black text-white mb-6">
+            Casos reales de IA aplicada
+        </h1>
+        <p class="text-xl text-gray-400 max-w-3xl mx-auto">
+            Arquitectura, decisiones técnicas y resultados.
+            Sin teoría. Sin humo.
+        </p>
+    </section>
+
+    <!-- CASO 1 -->
+    <section class="py-24 px-6 max-w-6xl mx-auto">
+        <div class="card p-10 rounded-2xl">
+
+            <h2 class="text-3xl font-bold text-white mb-6">
+                Agente IA interno para soporte operativo
+            </h2>
+
+            <!-- CONTEXTO -->
+            <div class="grid md:grid-cols-3 gap-8 mb-12">
+                <div>
+                    <h3 class="font-bold text-[#52d1ff] mb-2">Por qué</h3>
+                    <p class="text-gray-400">
+                        El equipo repetía las mismas consultas internas
+                        y perdía tiempo buscando información dispersa.
+                    </p>
+                </div>
+                <div>
+                    <h3 class="font-bold text-[#52d1ff] mb-2">Cómo</h3>
+                    <p class="text-gray-400">
+                        Agente desarrollado en <strong>Microsoft Copilot Studio</strong>,
+                        conectado a documentación interna y permisos por rol.
+                    </p>
+                </div>
+                <div>
+                    <h3 class="font-bold text-[#52d1ff] mb-2">Para qué</h3>
+                    <p class="text-gray-400">
+                        Responder preguntas internas en segundos,
+                        sin exponer datos ni depender de personas clave.
+                    </p>
+                </div>
+            </div>
+
+            <!-- GRÁFICOS -->
+            <div class="space-y-6">
+                <div>
+                    <p class="text-sm mb-1">⏱️ Tiempo ahorrado por semana</p>
+                    <div class="bg-gray-800 rounded-full">
+                        <div class="bar" data-width="75%"></div>
+                    </div>
+                </div>
+                <div>
+                    <p class="text-sm mb-1">❌ Reducción de errores operativos</p>
+                    <div class="bg-gray-800 rounded-full">
+                        <div class="bar" data-width="60%"></div>
+                    </div>
+                </div>
+                <div>
+                    <p class="text-sm mb-1">📈 Adopción del equipo</p>
+                    <div class="bg-gray-800 rounded-full">
+                        <div class="bar" data-width="90%"></div>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+    </section>
+
+    <!-- CTA -->
+    <section class="py-24 px-6 text-center">
+        <h2 class="text-3xl font-bold text-white mb-6">
+            Cada sistema es distinto
+        </h2>
+        <p class="text-gray-400 mb-10">
+            Diseño agentes y automatizaciones según tu entorno,
+            no según una herramienta de moda.
+        </p>
+        <a href="/#lead" class="px-10 py-4 rounded-full font-black text-white"
+            style="background:linear-gradient(to right,#52d1ff,#0072FF)">
+            Ver si tiene sentido para mi caso →
+        </a>
+    </section>
+
+    <footer class="py-12 text-center border-t border-gray-800">
+        <p class="text-gray-500 text-sm">
+            © 2026 YOIA.io · Casos reales de IA aplicada
+        </p>
+    </footer>
+
+    <script>
+        const bars = document.querySelectorAll('.bar');
+        const observer = new IntersectionObserver(entries => {
+            entries.forEach(entry => {
+                if (entry.isIntersecting) {
+                    entry.target.style.width = entry.target.dataset.width;
+                }
+            });
+        }, { threshold: 0.6 });
+
+        bars.forEach(bar => observer.observe(bar));
+    </script>
+
+</body>
+
+</html>
