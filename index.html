@@ -47,17 +47,6 @@
             border: 1px solid #30363d;
         }
     </style>
-
-    <!-- SCHEMA -->
-    <script type="application/ld+json">
-{
-  "@context": "https://schema.org",
-  "@type": "Organization",
-  "name": "YOIA.io",
-  "url": "https://yoia.io",
-  "logo": "https://yoia.io/img/favicon.png"
-}
-</script>
 </head>
 
 <body>
@@ -67,17 +56,10 @@
         <nav class="max-w-7xl mx-auto px-4 md:px-6 py-4 flex justify-between items-center">
             <span class="text-2xl md:text-3xl font-black text-gradient">YOIA.io</span>
 
-            <div class="flex items-center gap-4 md:gap-6">
-                <a href="/casos.html" class="text-sm font-bold text-gray-300 hover:text-[#52d1ff]">
-                    Casos
-                </a>
-
-                <a href="https://yoia.yzz.me/" target="_blank"
-                    class="text-sm font-bold text-gray-300 hover:text-[#52d1ff]">
-                    Foro
-                </a>
-
-                <a href="#lead" class="btn-primary px-4 py-2 md:px-6 md:py-2 rounded-full text-sm font-bold">
+            <div class="flex items-center gap-4 md:gap-6 text-sm font-bold">
+                <a href="/casos.html" class="text-gray-300 hover:text-[#52d1ff]">Casos reales</a>
+                <a href="https://yoia.yzz.me/" target="_blank" class="text-gray-300 hover:text-[#52d1ff]">Foro</a>
+                <a href="#lead" class="btn-primary px-4 py-2 rounded-full text-sm">
                     Hablar
                 </a>
             </div>
@@ -85,88 +67,87 @@
     </header>
 
     <!-- HERO -->
-    <section class="min-h-[70vh] md:min-h-[90vh] flex items-center justify-center px-4 md:px-6 text-center">
+    <section class="min-h-[80vh] flex items-center justify-center px-4 md:px-6 text-center">
         <div class="max-w-4xl">
-            <h1 class="text-4xl md:text-6xl lg:text-7xl font-black text-white mb-4 md:mb-6">
+
+            <h1 class="text-4xl md:text-6xl font-black text-white mb-6 leading-tight">
                 Agentes de IA y automatización real<br>
                 <span class="text-gradient">para empresas</span>
             </h1>
 
-            <p class="text-base md:text-xl text-gray-400 mb-6 md:mb-10">
+            <p class="text-base md:text-xl text-gray-400 mb-8">
                 Diseño agentes de IA profesionales integrados en
                 <strong>Microsoft Copilot Studio, OpenAI y Gemini</strong>.
                 Sin humo. Con seguridad.
             </p>
 
-            <div class="flex justify-center gap-4 md:gap-6 flex-wrap">
-                <a href="#lead"
-                    class="btn-primary px-6 py-3 md:px-10 md:py-4 rounded-full font-bold text-base md:text-lg">
+            <div class="flex flex-col md:flex-row justify-center gap-4 md:gap-6 mb-6">
+                <a href="#lead" class="btn-primary px-6 py-3 rounded-full font-bold">
                     Analizar mi caso ↓
                 </a>
 
                 <a href="/casos.html"
-                    class="px-6 py-3 md:px-10 md:py-4 rounded-full font-bold border border-gray-600 hover:border-[#52d1ff] text-base md:text-lg">
-                    Ver casos →
+                    class="px-6 py-3 rounded-full font-bold border border-gray-600 hover:border-[#52d1ff]">
+                    Ver casos reales →
                 </a>
             </div>
 
-            <p class="text-xs md:text-sm text-gray-500 mt-6">
+            <!-- Google Calendar -->
+            <div class="flex justify-center mt-6">
+                <link href="https://calendar.google.com/calendar/scheduling-button-script.css" rel="stylesheet">
+                <script src="https://calendar.google.com/calendar/scheduling-button-script.js" async></script>
+                <script>
+                    (function () {
+                        var target = document.currentScript;
+                        window.addEventListener('load', function () {
+                            calendar.schedulingButton.load({
+                                url: 'https://calendar.google.com/calendar/appointments/schedules/AcZssZ0Ze4HG6tBcqKUd1zqJIpQWIp_jBrCRgMecpG-k1c6Wgn5S0CKcH_K2wzD20pogYXbsJ7NzjYb_?gv=true',
+                                color: '#039BE5',
+                                label: "Reservar llamada gratuita",
+                                target,
+                            });
+                        });
+                    })();
+                </script>
+            </div>
+
+            <p class="text-xs text-gray-500 mt-6">
                 ✔ Casos reales · ✔ Seguridad enterprise · ✔ IA aplicada de verdad
             </p>
         </div>
     </section>
 
     <!-- FRAMEWORK -->
-    <section class="py-16 md:py-24 px-4 md:px-6 max-w-6xl mx-auto">
-        <h2 class="text-2xl md:text-4xl font-bold text-center mb-10 md:mb-16">
-            Framework YoIA
-        </h2>
-
-        <div class="grid gap-4 md:grid-cols-4 md:gap-8">
-            <div class="card p-4 md:p-6 rounded-xl text-sm md:text-base">1️⃣ Detectar tareas reales</div>
-            <div class="card p-4 md:p-6 rounded-xl text-sm md:text-base">2️⃣ Diseñar el agente IA</div>
-            <div class="card p-4 md:p-6 rounded-xl text-sm md:text-base">3️⃣ Integrarlo en tu entorno</div>
-            <div class="card p-4 md:p-6 rounded-xl text-sm md:text-base">4️⃣ Escalar con seguridad</div>
-        </div>
-
-        <div class="text-center mt-10">
-            <a href="/casos.html" class="text-sm font-bold text-[#52d1ff] hover:underline">
-                Ver casos reales →
-            </a>
+    <section class="py-20 px-4 md:px-6 max-w-6xl mx-auto">
+        <h2 class="text-3xl md:text-4xl font-bold text-center mb-12">Framework YoIA</h2>
+        <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-6">
+            <div class="card p-5 rounded-xl">1️⃣ Detectar tareas reales</div>
+            <div class="card p-5 rounded-xl">2️⃣ Diseñar el agente IA</div>
+            <div class="card p-5 rounded-xl">3️⃣ Integrarlo en tu entorno</div>
+            <div class="card p-5 rounded-xl">4️⃣ Escalar con seguridad</div>
         </div>
     </section>
 
     <!-- FORO -->
-    <section class="py-16 px-4 md:px-6 text-center">
-        <div class="max-w-3xl mx-auto card p-6 md:p-10 rounded-2xl">
-            <h3 class="text-xl md:text-2xl font-bold text-white mb-4">
-                Comunidad YOIA
-            </h3>
-            <p class="text-gray-400 mb-6 text-sm md:text-base">
-                Automatizaciones reales, decisiones técnicas y aprendizajes
-                que no publico en la web.
+    <section class="py-16 px-4 text-center">
+        <div class="max-w-3xl mx-auto card p-8 rounded-2xl">
+            <h3 class="text-2xl font-bold text-white mb-4">Comunidad YOIA</h3>
+            <p class="text-gray-400 mb-6">
+                Automatizaciones reales, decisiones técnicas y aprendizajes sin filtro.
             </p>
-            <a href="https://yoia.yzz.me/" target="_blank"
-                class="btn-primary px-6 py-3 rounded-full font-bold text-sm md:text-base">
+            <a href="https://yoia.yzz.me/" target="_blank" class="btn-primary px-6 py-3 rounded-full font-bold">
                 Acceder al foro →
             </a>
         </div>
     </section>
 
-    <!-- FORMULARIO -->
-    <section id="lead" class="py-16 md:py-24 bg-[#161b22] px-4 md:px-6">
+    <!-- FORM -->
+    <section id="lead" class="py-20 bg-[#161b22] px-4">
         <div class="max-w-xl mx-auto text-center">
-            <h2 class="text-2xl md:text-3xl font-bold text-white mb-4 md:mb-6">
-                ¿Hablamos de tu caso?
-            </h2>
-            <p class="text-gray-400 mb-6 md:mb-8 text-sm md:text-base">
-                Selecciona tu perfil y seguimos.
-            </p>
+            <h2 class="text-3xl font-bold text-white mb-6">¿Hablamos de tu caso?</h2>
 
-            <form id="leadForm" class="flex flex-col gap-3 md:gap-4">
-                <select id="tipo"
-                    class="px-4 py-2 md:py-3 rounded bg-black border border-gray-700 text-gray-400 text-sm md:text-base"
-                    required>
+            <form id="leadForm" class="flex flex-col gap-4">
+                <select id="tipo" class="px-4 py-3 rounded bg-black border border-gray-700 text-gray-400" required>
                     <option value="">Soy…</option>
                     <option value="empresa">Empresa</option>
                     <option value="autonomo">Autónomo</option>
@@ -174,83 +155,44 @@
                 </select>
 
                 <input id="nombre" type="text" placeholder="Tu nombre"
-                    class="px-4 py-2 md:py-3 rounded bg-black border border-gray-700 hidden text-sm md:text-base">
-
+                    class="px-4 py-3 rounded bg-black border border-gray-700 hidden">
                 <input id="telefono" type="tel" placeholder="Tu WhatsApp"
-                    class="px-4 py-2 md:py-3 rounded bg-black border border-gray-700 hidden text-sm md:text-base">
+                    class="px-4 py-3 rounded bg-black border border-gray-700 hidden">
 
                 <input id="email" type="email" placeholder="Tu email"
-                    class="px-4 py-2 md:py-3 rounded bg-black border border-gray-700 text-sm md:text-base" required>
+                    class="px-4 py-3 rounded bg-black border border-gray-700" required>
 
-                <button type="submit" class="btn-primary py-3 rounded-full font-bold text-sm md:text-base">
+                <button type="submit" class="btn-primary py-3 rounded-full font-bold">
                     Enviar
                 </button>
 
                 <p id="formMsg" class="text-sm text-gray-400 hidden"></p>
             </form>
+
+            <!-- Calendar again -->
+            <div class="mt-10">
+                <link href="https://calendar.google.com/calendar/scheduling-button-script.css" rel="stylesheet">
+                <script src="https://calendar.google.com/calendar/scheduling-button-script.js" async></script>
+                <script>
+                    (function () {
+                        var target = document.currentScript;
+                        window.addEventListener('load', function () {
+                            calendar.schedulingButton.load({
+                                url: 'https://calendar.google.com/calendar/appointments/schedules/AcZssZ0Ze4HG6tBcqKUd1zqJIpQWIp_jBrCRgMecpG-k1c6Wgn5S0CKcH_K2wzD20pogYXbsJ7NzjYb_?gv=true',
+                                color: '#039BE5',
+                                label: "Agendar llamada gratuita",
+                                target,
+                            });
+                        });
+                    })();
+                </script>
+            </div>
         </div>
     </section>
 
-    <!-- FOOTER -->
     <footer class="py-10 text-center border-t border-gray-800">
-        <div class="flex justify-center gap-6 mb-4 text-sm">
-            <a href="/casos.html" class="text-gray-400 hover:text-[#52d1ff]">Casos</a>
-            <a href="https://yoia.yzz.me/" target="_blank" class="text-gray-400 hover:text-[#52d1ff]">Foro</a>
-        </div>
-        <p class="text-gray-500 text-xs md:text-sm">© 2026 YOIA.io</p>
+        <p class="text-gray-500 text-sm">© 2026 YOIA.io</p>
     </footer>
-
-    <!-- JS -->
-    <script>
-        const tipo = document.getElementById('tipo');
-        const nombre = document.getElementById('nombre');
-        const telefono = document.getElementById('telefono');
-        const msg = document.getElementById('formMsg');
-        const form = document.getElementById('leadForm');
-
-        tipo.addEventListener('change', () => {
-            if (tipo.value === 'persona') {
-                nombre.classList.remove('hidden');
-                telefono.classList.remove('hidden');
-                nombre.required = true;
-                telefono.required = true;
-            } else {
-                nombre.classList.add('hidden');
-                telefono.classList.add('hidden');
-                nombre.required = false;
-                telefono.required = false;
-            }
-        });
-
-        form.addEventListener('submit', async e => {
-            e.preventDefault();
-
-            const payload = {
-                tipo: tipo.value,
-                nombre: nombre.value || '',
-                telefono: telefono.value || '',
-                email: email.value,
-                source: 'yoia.io',
-                timestamp: new Date().toISOString()
-            };
-
-            try {
-                await fetch('https://hook.eu1.make.com/mmco0981h4s6ijuyop6cp8flwtyr5iq4', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(payload)
-                });
-
-                msg.innerHTML = `✅ Gracias.<br><a href="https://yoia.yzz.me/" target="_blank"
-                class="underline text-[#52d1ff] font-bold">Acceder al foro →</a>`;
-                msg.classList.remove('hidden');
-                form.reset();
-            } catch {
-                msg.textContent = '❌ Error al enviar.';
-                msg.classList.remove('hidden');
-            }
-        });
-    </script>
 
 </body>
 
