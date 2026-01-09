@@ -40,18 +40,18 @@
 
     <!-- SCHEMA -->
     <script type="application/ld+json">
-{
-  "@context":"https://schema.org",
-  "@type":"CollectionPage",
-  "name":"Casos reales de IA aplicada",
-  "url":"https://yoia.io/casos.html",
-  "publisher":{
-    "@type":"Organization",
-    "name":"YOIA.io",
-    "url":"https://yoia.io"
+  {
+    "@context":"https://schema.org",
+    "@type":"CollectionPage",
+    "name":"Casos reales de IA aplicada",
+    "url":"https://yoia.io/casos.html",
+    "publisher":{
+      "@type":"Organization",
+      "name":"YOIA.io",
+      "url":"https://yoia.io"
+    }
   }
-}
-</script>
+  </script>
 </head>
 
 <body>
@@ -94,9 +94,18 @@
                     <li>✔ Datos nunca salen del tenant Microsoft</li>
                     <li>✔ Uso diario por empleados reales</li>
                 </ul>
-                <p class="mt-4 text-xs md:text-sm text-[#52d1ff] font-bold">
-                    Resultado: reducción drástica del tiempo por consulta
-                </p>
+
+                <!-- Testimonio -->
+                <div class="mt-6 pt-4 border-t border-gray-700">
+                    <p class="text-sm italic text-gray-400">
+                        “Estamos muy contentos con la implementación.
+                        El agente se usa a diario y ha reducido notablemente
+                        el tiempo que dedicaba el equipo a consultas internas.”
+                    </p>
+                    <p class="text-xs text-gray-500 mt-2">
+                        Responsable de Operaciones · Empresa sector servicios
+                    </p>
+                </div>
             </div>
 
             <div class="card p-4 md:p-6 rounded-xl">
@@ -123,8 +132,19 @@
                 <ul class="text-gray-400 space-y-2 text-sm md:text-base">
                     <li>✔ Reducción del 62% en tareas manuales</li>
                     <li>✔ Respuesta en minutos, no horas</li>
-                    <li>✔ Sin tocar el stack existente</li>
+                    <li>✔ Integración sin fricción</li>
                 </ul>
+
+                <!-- Testimonio -->
+                <div class="mt-6 pt-4 border-t border-gray-700">
+                    <p class="text-sm italic text-gray-400">
+                        “La automatización encajó perfectamente en nuestros procesos.
+                        El equipo confía en el sistema y lo usa como parte del flujo diario.”
+                    </p>
+                    <p class="text-xs text-gray-500 mt-2">
+                        Responsable de Soporte · Empresa tecnológica
+                    </p>
+                </div>
             </div>
         </div>
     </section>
@@ -145,6 +165,17 @@
                     <li>✔ Email + seguimiento automático</li>
                     <li>✔ Más reuniones con el mismo tráfico</li>
                 </ul>
+
+                <!-- Testimonio -->
+                <div class="mt-6 pt-4 border-t border-gray-700">
+                    <p class="text-sm italic text-gray-400">
+                        “Ahora los leads llegan mucho más cualificados
+                        y las reuniones se gestionan sin fricción.”
+                    </p>
+                    <p class="text-xs text-gray-500 mt-2">
+                        Founder · Servicios profesionales
+                    </p>
+                </div>
             </div>
 
             <div class="card p-4 md:p-6 rounded-xl">
@@ -187,10 +218,7 @@
                     backgroundColor: '#52d1ff'
                 }]
             },
-            options: {
-                responsive: true,
-                maintainAspectRatio: false
-            }
+            options: { responsive: true, maintainAspectRatio: false }
         });
 
         new Chart(document.getElementById('chartAutomation'), {
@@ -203,10 +231,7 @@
                     borderColor: '#52d1ff'
                 }]
             },
-            options: {
-                responsive: true,
-                maintainAspectRatio: false
-            }
+            options: { responsive: true, maintainAspectRatio: false }
         });
 
         new Chart(document.getElementById('chartLeads'), {
@@ -218,10 +243,7 @@
                     backgroundColor: ['#52d1ff', '#30363d']
                 }]
             },
-            options: {
-                responsive: true,
-                maintainAspectRatio: false
-            }
+            options: { responsive: true, maintainAspectRatio: false }
         });
     </script>
 
