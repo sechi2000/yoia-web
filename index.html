@@ -92,10 +92,99 @@
                     Ver casos reales
                 </a>
             </div>
+
+            <p class="text-sm text-gray-500 mt-6">
+                ✔ IA aplicada · ✔ Seguridad enterprise · ✔ Resultados medibles
+            </p>
         </div>
     </section>
 
-    <!-- LEAD -->
+    <!-- RESULTADOS -->
+    <section class="py-20 px-4 max-w-6xl mx-auto">
+        <h2 class="text-3xl sm:text-4xl font-bold text-center mb-12">
+            Resultados reales en producción
+        </h2>
+
+        <div class="grid sm:grid-cols-2 md:grid-cols-4 gap-6 text-center">
+            <div class="card p-6 rounded-xl">
+                <p class="text-3xl font-black text-gradient mb-2">−70%</p>
+                <p class="text-sm text-gray-400">Tiempo por consulta interna</p>
+            </div>
+            <div class="card p-6 rounded-xl">
+                <p class="text-3xl font-black text-gradient mb-2">×3</p>
+                <p class="text-sm text-gray-400">Velocidad operativa</p>
+            </div>
+            <div class="card p-6 rounded-xl">
+                <p class="text-3xl font-black text-gradient mb-2">100%</p>
+                <p class="text-sm text-gray-400">Uso en entornos reales</p>
+            </div>
+            <div class="card p-6 rounded-xl">
+                <p class="text-3xl font-black text-gradient mb-2">0</p>
+                <p class="text-sm text-gray-400">Datos fuera del entorno</p>
+            </div>
+        </div>
+    </section>
+
+    <!-- COMO TRABAJO -->
+    <section class="py-20 px-4 bg-[#161b22]">
+        <div class="max-w-5xl mx-auto text-center">
+            <h2 class="text-3xl sm:text-4xl font-bold mb-10">
+                Cómo trabajo (y cómo no)
+            </h2>
+
+            <div class="grid md:grid-cols-2 gap-6 text-left text-sm">
+                <div class="card p-6 rounded-xl">
+                    <p class="font-bold text-white mb-2">✔ Lo que sí hago</p>
+                    <ul class="text-gray-400 space-y-2">
+                        <li>• Analizar procesos reales antes de usar IA</li>
+                        <li>• Diseñar agentes integrados en tu stack</li>
+                        <li>• Priorizar seguridad, control y trazabilidad</li>
+                        <li>• Medir impacto antes de escalar</li>
+                    </ul>
+                </div>
+
+                <div class="card p-6 rounded-xl">
+                    <p class="font-bold text-white mb-2">✖ Lo que no hago</p>
+                    <ul class="text-gray-400 space-y-2">
+                        <li>• Demos bonitas sin uso real</li>
+                        <li>• Vender herramientas por moda</li>
+                        <li>• Meter IA donde no aporta valor</li>
+                        <li>• Promesas sin métricas</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- CASOS -->
+    <section class="py-20 px-4 text-center">
+        <h2 class="text-3xl font-bold mb-6">
+            Casos reales documentados
+        </h2>
+        <p class="text-gray-400 mb-8 max-w-2xl mx-auto">
+            Agentes internos, automatización operativa y sistemas
+            que conectan web, WhatsApp y agenda.
+        </p>
+        <a href="/casos.html" class="btn-primary px-8 py-3 rounded-full font-bold">
+            Ver casos reales →
+        </a>
+    </section>
+
+    <!-- FORO -->
+    <section class="py-16 px-4 text-center">
+        <div class="max-w-2xl mx-auto card p-8 rounded-2xl">
+            <h3 class="text-2xl font-bold mb-4">Comunidad YOIA</h3>
+            <p class="text-gray-400 mb-6">
+                Casos, decisiones técnicas y automatizaciones reales
+                compartidas sin postureo.
+            </p>
+            <a href="https://yoia.yzz.me/" target="_blank" class="btn-primary px-7 py-3 rounded-full font-bold">
+                Acceder al foro
+            </a>
+        </div>
+    </section>
+
+    <!-- FORMULARIO -->
     <section id="lead" class="py-20 bg-[#161b22] px-4">
         <div class="max-w-md mx-auto text-center">
             <h2 class="text-2xl sm:text-3xl font-bold mb-4">
@@ -106,7 +195,6 @@
             </p>
 
             <form id="leadForm" class="flex flex-col gap-4">
-
                 <select id="tipo" required class="px-4 py-3 rounded bg-black border border-gray-700">
                     <option value="">Soy…</option>
                     <option value="empresa">Empresa</option>
@@ -130,7 +218,7 @@
                 <p id="formMsg" class="text-sm text-gray-400 hidden"></p>
             </form>
 
-            <!-- CALENDAR -->
+            <!-- AGENDA -->
             <div class="mt-8">
                 <link href="https://calendar.google.com/calendar/scheduling-button-script.css" rel="stylesheet">
                 <script src="https://calendar.google.com/calendar/scheduling-button-script.js" async></script>
