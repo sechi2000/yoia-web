@@ -8,14 +8,12 @@
     <title>Agentes de IA y Automatización para Empresas | YOIA.io</title>
 
     <meta name="description"
-        content="Diseño y desarrollo de agentes de IA y automatizaciones reales para empresas. Microsoft Copilot Studio, OpenAI y Gemini con foco en seguridad y resultados." />
+        content="Agentes de IA y automatizaciones reales en producción. Microsoft Copilot Studio, OpenAI y Gemini con foco en seguridad, control y resultados medibles." />
     <meta name="robots" content="index, follow" />
     <link rel="canonical" href="https://yoia.io/" />
 
-    <!-- ICON -->
     <link rel="icon" type="image/png" href="./img/favicon.png" />
 
-    <!-- CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800;900&display=swap" rel="stylesheet">
 
@@ -43,17 +41,16 @@
         }
     </style>
 
-    <!-- SCHEMA -->
     <script type="application/ld+json">
-  {
-    "@context": "https://schema.org",
-    "@type": "Organization",
-    "name": "YOIA.io",
-    "url": "https://yoia.io",
-    "description": "Agentes de IA y automatización enterprise para empresas",
-    "sameAs": ["https://www.linkedin.com/company/yoia-io/"]
-  }
-  </script>
+    {
+      "@context":"https://schema.org",
+      "@type":"Organization",
+      "name":"YOIA.io",
+      "url":"https://yoia.io",
+      "description":"Agentes de IA y automatización enterprise para empresas",
+      "sameAs":["https://www.linkedin.com/company/yoia-io/"]
+    }
+    </script>
 </head>
 
 <body>
@@ -63,10 +60,12 @@
         <nav class="max-w-7xl mx-auto px-4 py-4 flex justify-between items-center">
             <span class="text-2xl font-black text-gradient">YOIA.io</span>
             <div class="hidden md:flex gap-6 items-center">
-                <a href="/casos.html" class="text-sm font-semibold text-gray-300 hover:text-[#52d1ff]">Casos reales</a>
+                <a href="/casos.html" class="text-sm font-semibold hover:text-[#52d1ff]">Casos reales</a>
                 <a href="https://yoia.yzz.me/" target="_blank"
-                    class="text-sm font-semibold text-gray-300 hover:text-[#52d1ff]">Foro</a>
-                <a href="#lead" class="btn-primary px-5 py-2 rounded-full text-sm font-bold">Hablar sobre mi caso</a>
+                    class="text-sm font-semibold hover:text-[#52d1ff]">Foro</a>
+                <a href="#lead" class="btn-primary px-5 py-2 rounded-full text-sm font-bold">
+                    Hablar sobre mi caso
+                </a>
             </div>
         </nav>
     </header>
@@ -80,78 +79,49 @@
             </h1>
 
             <p class="text-lg sm:text-xl text-gray-400 mb-8">
-                Diseño agentes de IA reales integrados en
-                <strong>Microsoft Copilot Studio, OpenAI y Gemini</strong>.
-                Seguridad, control y uso en producción.
+                Sistemas de IA diseñados para usarse en producción,
+                integrados en <strong>Microsoft Copilot Studio, OpenAI y Gemini</strong>.
+                Sin demos. Sin humo.
             </p>
 
             <div class="flex flex-col sm:flex-row justify-center gap-4">
-                <a href="#lead" class="btn-primary px-8 py-3 rounded-full font-bold text-base">
+                <a href="#lead" class="btn-primary px-8 py-3 rounded-full font-bold">
                     Analizar mi caso
                 </a>
                 <a href="/casos.html" class="px-8 py-3 rounded-full border border-gray-600 font-semibold">
                     Ver casos reales
                 </a>
             </div>
-
-            <p class="text-sm text-gray-500 mt-6">
-                ✔ IA aplicada · ✔ Seguridad enterprise · ✔ Resultados medibles
-            </p>
-        </div>
-    </section>
-
-    <!-- FRAMEWORK -->
-    <section class="py-20 px-4 max-w-6xl mx-auto">
-        <h2 class="text-3xl sm:text-4xl font-bold text-center mb-12">
-            Framework YOIA
-        </h2>
-        <div class="grid sm:grid-cols-2 md:grid-cols-4 gap-6 text-sm">
-            <div class="card p-5 rounded-xl">1️⃣ Detectar tareas reales</div>
-            <div class="card p-5 rounded-xl">2️⃣ Diseñar el agente IA</div>
-            <div class="card p-5 rounded-xl">3️⃣ Integrarlo en tu entorno</div>
-            <div class="card p-5 rounded-xl">4️⃣ Escalar con seguridad</div>
-        </div>
-    </section>
-
-    <!-- FORO -->
-    <section class="py-16 px-4 text-center">
-        <div class="max-w-2xl mx-auto card p-8 rounded-2xl">
-            <h3 class="text-2xl font-bold text-white mb-4">Comunidad YOIA</h3>
-            <p class="text-gray-400 mb-6">
-                Casos reales, decisiones técnicas y automatizaciones
-                que no publico en la web.
-            </p>
-            <a href="https://yoia.yzz.me/" target="_blank" class="btn-primary px-7 py-3 rounded-full font-bold">
-                Acceder al foro
-            </a>
         </div>
     </section>
 
     <!-- LEAD -->
     <section id="lead" class="py-20 bg-[#161b22] px-4">
         <div class="max-w-md mx-auto text-center">
-            <h2 class="text-2xl sm:text-3xl font-bold text-white mb-4">
+            <h2 class="text-2xl sm:text-3xl font-bold mb-4">
                 ¿Hablamos de tu caso?
             </h2>
             <p class="text-gray-400 mb-6">
-                Cuéntame quién eres y vemos si tiene sentido.
+                Déjame tus datos y te contacto directamente.
             </p>
 
             <form id="leadForm" class="flex flex-col gap-4">
-                <select id="tipo" class="px-4 py-3 rounded bg-black border border-gray-700" required>
+
+                <select id="tipo" required class="px-4 py-3 rounded bg-black border border-gray-700">
                     <option value="">Soy…</option>
                     <option value="empresa">Empresa</option>
                     <option value="autonomo">Autónomo</option>
                     <option value="persona">Persona</option>
                 </select>
 
-                <input id="nombre" type="text" placeholder="Tu nombre"
-                    class="px-4 py-3 rounded bg-black border border-gray-700 hidden">
-                <input id="telefono" type="tel" placeholder="Tu WhatsApp"
-                    class="px-4 py-3 rounded bg-black border border-gray-700 hidden">
+                <input id="nombre" type="text" required placeholder="Tu nombre"
+                    class="px-4 py-3 rounded bg-black border border-gray-700">
 
-                <input id="email" type="email" placeholder="Tu email"
-                    class="px-4 py-3 rounded bg-black border border-gray-700" required>
+                <input id="telefono" type="tel" required placeholder="Tu teléfono / WhatsApp"
+                    class="px-4 py-3 rounded bg-black border border-gray-700">
+
+                <input id="email" type="email" required placeholder="Tu email"
+                    class="px-4 py-3 rounded bg-black border border-gray-700">
 
                 <button type="submit" class="btn-primary py-3 rounded-full font-bold">
                     Enviar
@@ -160,7 +130,7 @@
                 <p id="formMsg" class="text-sm text-gray-400 hidden"></p>
             </form>
 
-            <!-- GOOGLE CALENDAR -->
+            <!-- CALENDAR -->
             <div class="mt-8">
                 <link href="https://calendar.google.com/calendar/scheduling-button-script.css" rel="stylesheet">
                 <script src="https://calendar.google.com/calendar/scheduling-button-script.js" async></script>
@@ -178,44 +148,22 @@
         </div>
     </section>
 
-    <!-- FOOTER -->
     <footer class="py-10 text-center border-t border-gray-800 text-sm">
-        <div class="flex justify-center gap-6 mb-4">
-            <a href="/casos.html" class="hover:text-[#52d1ff]">Casos reales</a>
-            <a href="https://yoia.yzz.me/" target="_blank" class="hover:text-[#52d1ff]">Foro</a>
-        </div>
         <p class="text-gray-500">© 2026 YOIA.io</p>
     </footer>
 
-    <!-- FORM JS -->
     <script>
-        const tipo = document.getElementById('tipo');
-        const nombre = document.getElementById('nombre');
-        const telefono = document.getElementById('telefono');
-        const msg = document.getElementById('formMsg');
         const form = document.getElementById('leadForm');
-
-        tipo.addEventListener('change', () => {
-            if (tipo.value === 'persona') {
-                nombre.classList.remove('hidden');
-                telefono.classList.remove('hidden');
-                nombre.required = true;
-                telefono.required = true;
-            } else {
-                nombre.classList.add('hidden');
-                telefono.classList.add('hidden');
-                nombre.required = false;
-                telefono.required = false;
-            }
-        });
+        const msg = document.getElementById('formMsg');
 
         form.addEventListener('submit', async e => {
             e.preventDefault();
+
             const payload = {
-                tipo: tipo.value,
-                nombre: nombre.value || '',
-                telefono: telefono.value || '',
-                email: email.value,
+                tipo: document.getElementById('tipo').value,
+                nombre: document.getElementById('nombre').value,
+                telefono: document.getElementById('telefono').value,
+                email: document.getElementById('email').value,
                 source: 'yoia.io',
                 timestamp: new Date().toISOString()
             };
@@ -227,11 +175,11 @@
                     body: JSON.stringify(payload)
                 });
 
-                msg.innerHTML = `✅ Gracias.<br>
-      Puedes continuar en el foro:<br>
-      <a href="https://yoia.yzz.me/" target="_blank" class="underline text-[#52d1ff] font-bold">
-        Acceder al foro →
-      </a>`;
+                msg.innerHTML = `✅ Gracias, te contactaré personalmente.<br><br>
+            <a href="https://yoia.yzz.me/" target="_blank"
+               class="underline text-[#52d1ff] font-bold">
+              Acceder al foro →
+            </a>`;
                 msg.classList.remove('hidden');
                 form.reset();
             } catch {
