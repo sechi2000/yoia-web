@@ -2,22 +2,22 @@
 <html lang="es" class="scroll-smooth">
 
 <head>
-    <!-- SEO -->
+    <!-- SEO BASE -->
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>YOIA.io | Agentes de IA y Automatización Enterprise</title>
+    <title>Agentes de IA y Automatización para Empresas | YOIA.io</title>
 
     <meta name="description"
-        content="Diseño y desarrollo de agentes de IA y automatizaciones para empresas. Microsoft Copilot Studio, OpenAI y Gemini con foco en seguridad, control y resultados reales." />
+        content="Diseño y desarrollo de agentes de IA y automatizaciones reales para empresas. Microsoft Copilot Studio, OpenAI y Gemini con foco en seguridad y resultados." />
     <meta name="robots" content="index, follow" />
     <link rel="canonical" href="https://yoia.io/" />
 
-    <!-- ICONO -->
+    <!-- ICON -->
     <link rel="icon" type="image/png" href="./img/favicon.png" />
 
-    <!-- CSS / FUENTES -->
+    <!-- CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;700;900&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800;900&display=swap" rel="stylesheet">
 
     <style>
         body {
@@ -37,90 +37,75 @@
             box-shadow: 0 4px 15px rgba(82, 209, 255, .25);
         }
 
-        .btn-primary:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 0 25px rgba(82, 209, 255, .45);
-        }
-
         .card {
             background: #161b22;
             border: 1px solid #30363d;
         }
     </style>
+
+    <!-- SCHEMA -->
+    <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "Organization",
+    "name": "YOIA.io",
+    "url": "https://yoia.io",
+    "description": "Agentes de IA y automatización enterprise para empresas",
+    "sameAs": ["https://www.linkedin.com/company/yoia-io/"]
+  }
+  </script>
 </head>
 
 <body>
 
     <!-- HEADER -->
-    <header class="sticky top-0 z-50 bg-[#0d1117]/90 backdrop-blur border-b border-gray-800">
-        <nav class="max-w-7xl mx-auto px-4 md:px-6 py-4 flex justify-between items-center">
-            <span class="text-2xl md:text-3xl font-black text-gradient">YOIA.io</span>
-
-            <div class="flex items-center gap-4 md:gap-6 text-sm font-bold">
-                <a href="/casos.html" class="text-gray-300 hover:text-[#52d1ff]">Casos reales</a>
-                <a href="https://yoia.yzz.me/" target="_blank" class="text-gray-300 hover:text-[#52d1ff]">Foro</a>
-                <a href="#lead" class="btn-primary px-4 py-2 rounded-full text-sm">
-                    Hablar
-                </a>
+    <header class="sticky top-0 z-50 bg-[#0d1117]/95 backdrop-blur border-b border-gray-800">
+        <nav class="max-w-7xl mx-auto px-4 py-4 flex justify-between items-center">
+            <span class="text-2xl font-black text-gradient">YOIA.io</span>
+            <div class="hidden md:flex gap-6 items-center">
+                <a href="/casos.html" class="text-sm font-semibold text-gray-300 hover:text-[#52d1ff]">Casos reales</a>
+                <a href="https://yoia.yzz.me/" target="_blank"
+                    class="text-sm font-semibold text-gray-300 hover:text-[#52d1ff]">Foro</a>
+                <a href="#lead" class="btn-primary px-5 py-2 rounded-full text-sm font-bold">Hablar sobre mi caso</a>
             </div>
         </nav>
     </header>
 
     <!-- HERO -->
-    <section class="min-h-[80vh] flex items-center justify-center px-4 md:px-6 text-center">
-        <div class="max-w-4xl">
-
-            <h1 class="text-4xl md:text-6xl font-black text-white mb-6 leading-tight">
-                Agentes de IA y automatización real<br>
+    <section class="min-h-[85vh] flex items-center justify-center px-4 text-center">
+        <div class="max-w-3xl">
+            <h1 class="text-4xl sm:text-5xl md:text-6xl font-black text-white mb-6">
+                Agentes de IA y automatización<br>
                 <span class="text-gradient">para empresas</span>
             </h1>
 
-            <p class="text-base md:text-xl text-gray-400 mb-8">
-                Diseño agentes de IA profesionales integrados en
+            <p class="text-lg sm:text-xl text-gray-400 mb-8">
+                Diseño agentes de IA reales integrados en
                 <strong>Microsoft Copilot Studio, OpenAI y Gemini</strong>.
-                Sin humo. Con seguridad.
+                Seguridad, control y uso en producción.
             </p>
 
-            <div class="flex flex-col md:flex-row justify-center gap-4 md:gap-6 mb-6">
-                <a href="#lead" class="btn-primary px-6 py-3 rounded-full font-bold">
-                    Analizar mi caso ↓
+            <div class="flex flex-col sm:flex-row justify-center gap-4">
+                <a href="#lead" class="btn-primary px-8 py-3 rounded-full font-bold text-base">
+                    Analizar mi caso
                 </a>
-
-                <a href="/casos.html"
-                    class="px-6 py-3 rounded-full font-bold border border-gray-600 hover:border-[#52d1ff]">
-                    Ver casos reales →
+                <a href="/casos.html" class="px-8 py-3 rounded-full border border-gray-600 font-semibold">
+                    Ver casos reales
                 </a>
             </div>
 
-            <!-- Google Calendar -->
-            <div class="flex justify-center mt-6">
-                <link href="https://calendar.google.com/calendar/scheduling-button-script.css" rel="stylesheet">
-                <script src="https://calendar.google.com/calendar/scheduling-button-script.js" async></script>
-                <script>
-                    (function () {
-                        var target = document.currentScript;
-                        window.addEventListener('load', function () {
-                            calendar.schedulingButton.load({
-                                url: 'https://calendar.google.com/calendar/appointments/schedules/AcZssZ0Ze4HG6tBcqKUd1zqJIpQWIp_jBrCRgMecpG-k1c6Wgn5S0CKcH_K2wzD20pogYXbsJ7NzjYb_?gv=true',
-                                color: '#039BE5',
-                                label: "Reservar llamada gratuita",
-                                target,
-                            });
-                        });
-                    })();
-                </script>
-            </div>
-
-            <p class="text-xs text-gray-500 mt-6">
-                ✔ Casos reales · ✔ Seguridad enterprise · ✔ IA aplicada de verdad
+            <p class="text-sm text-gray-500 mt-6">
+                ✔ IA aplicada · ✔ Seguridad enterprise · ✔ Resultados medibles
             </p>
         </div>
     </section>
 
     <!-- FRAMEWORK -->
-    <section class="py-20 px-4 md:px-6 max-w-6xl mx-auto">
-        <h2 class="text-3xl md:text-4xl font-bold text-center mb-12">Framework YoIA</h2>
-        <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-6">
+    <section class="py-20 px-4 max-w-6xl mx-auto">
+        <h2 class="text-3xl sm:text-4xl font-bold text-center mb-12">
+            Framework YOIA
+        </h2>
+        <div class="grid sm:grid-cols-2 md:grid-cols-4 gap-6 text-sm">
             <div class="card p-5 rounded-xl">1️⃣ Detectar tareas reales</div>
             <div class="card p-5 rounded-xl">2️⃣ Diseñar el agente IA</div>
             <div class="card p-5 rounded-xl">3️⃣ Integrarlo en tu entorno</div>
@@ -130,24 +115,30 @@
 
     <!-- FORO -->
     <section class="py-16 px-4 text-center">
-        <div class="max-w-3xl mx-auto card p-8 rounded-2xl">
+        <div class="max-w-2xl mx-auto card p-8 rounded-2xl">
             <h3 class="text-2xl font-bold text-white mb-4">Comunidad YOIA</h3>
             <p class="text-gray-400 mb-6">
-                Automatizaciones reales, decisiones técnicas y aprendizajes sin filtro.
+                Casos reales, decisiones técnicas y automatizaciones
+                que no publico en la web.
             </p>
-            <a href="https://yoia.yzz.me/" target="_blank" class="btn-primary px-6 py-3 rounded-full font-bold">
-                Acceder al foro →
+            <a href="https://yoia.yzz.me/" target="_blank" class="btn-primary px-7 py-3 rounded-full font-bold">
+                Acceder al foro
             </a>
         </div>
     </section>
 
-    <!-- FORM -->
+    <!-- LEAD -->
     <section id="lead" class="py-20 bg-[#161b22] px-4">
-        <div class="max-w-xl mx-auto text-center">
-            <h2 class="text-3xl font-bold text-white mb-6">¿Hablamos de tu caso?</h2>
+        <div class="max-w-md mx-auto text-center">
+            <h2 class="text-2xl sm:text-3xl font-bold text-white mb-4">
+                ¿Hablamos de tu caso?
+            </h2>
+            <p class="text-gray-400 mb-6">
+                Cuéntame quién eres y vemos si tiene sentido.
+            </p>
 
             <form id="leadForm" class="flex flex-col gap-4">
-                <select id="tipo" class="px-4 py-3 rounded bg-black border border-gray-700 text-gray-400" required>
+                <select id="tipo" class="px-4 py-3 rounded bg-black border border-gray-700" required>
                     <option value="">Soy…</option>
                     <option value="empresa">Empresa</option>
                     <option value="autonomo">Autónomo</option>
@@ -169,30 +160,86 @@
                 <p id="formMsg" class="text-sm text-gray-400 hidden"></p>
             </form>
 
-            <!-- Calendar again -->
-            <div class="mt-10">
+            <!-- GOOGLE CALENDAR -->
+            <div class="mt-8">
                 <link href="https://calendar.google.com/calendar/scheduling-button-script.css" rel="stylesheet">
                 <script src="https://calendar.google.com/calendar/scheduling-button-script.js" async></script>
                 <script>
-                    (function () {
-                        var target = document.currentScript;
-                        window.addEventListener('load', function () {
-                            calendar.schedulingButton.load({
-                                url: 'https://calendar.google.com/calendar/appointments/schedules/AcZssZ0Ze4HG6tBcqKUd1zqJIpQWIp_jBrCRgMecpG-k1c6Wgn5S0CKcH_K2wzD20pogYXbsJ7NzjYb_?gv=true',
-                                color: '#039BE5',
-                                label: "Agendar llamada gratuita",
-                                target,
-                            });
+                    window.addEventListener('load', function () {
+                        calendar.schedulingButton.load({
+                            url: 'https://calendar.google.com/calendar/appointments/schedules/AcZssZ0Ze4HG6tBcqKUd1zqJIpQWIp_jBrCRgMecpG-k1c6Wgn5S0CKcH_K2wzD20pogYXbsJ7NzjYb_?gv=true',
+                            color: '#52d1ff',
+                            label: 'Reservar llamada gratuita',
+                            target: document.currentScript
                         });
-                    })();
+                    });
                 </script>
             </div>
         </div>
     </section>
 
-    <footer class="py-10 text-center border-t border-gray-800">
-        <p class="text-gray-500 text-sm">© 2026 YOIA.io</p>
+    <!-- FOOTER -->
+    <footer class="py-10 text-center border-t border-gray-800 text-sm">
+        <div class="flex justify-center gap-6 mb-4">
+            <a href="/casos.html" class="hover:text-[#52d1ff]">Casos reales</a>
+            <a href="https://yoia.yzz.me/" target="_blank" class="hover:text-[#52d1ff]">Foro</a>
+        </div>
+        <p class="text-gray-500">© 2026 YOIA.io</p>
     </footer>
+
+    <!-- FORM JS -->
+    <script>
+        const tipo = document.getElementById('tipo');
+        const nombre = document.getElementById('nombre');
+        const telefono = document.getElementById('telefono');
+        const msg = document.getElementById('formMsg');
+        const form = document.getElementById('leadForm');
+
+        tipo.addEventListener('change', () => {
+            if (tipo.value === 'persona') {
+                nombre.classList.remove('hidden');
+                telefono.classList.remove('hidden');
+                nombre.required = true;
+                telefono.required = true;
+            } else {
+                nombre.classList.add('hidden');
+                telefono.classList.add('hidden');
+                nombre.required = false;
+                telefono.required = false;
+            }
+        });
+
+        form.addEventListener('submit', async e => {
+            e.preventDefault();
+            const payload = {
+                tipo: tipo.value,
+                nombre: nombre.value || '',
+                telefono: telefono.value || '',
+                email: email.value,
+                source: 'yoia.io',
+                timestamp: new Date().toISOString()
+            };
+
+            try {
+                await fetch('https://hook.eu1.make.com/mmco0981h4s6ijuyop6cp8flwtyr5iq4', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+
+                msg.innerHTML = `✅ Gracias.<br>
+      Puedes continuar en el foro:<br>
+      <a href="https://yoia.yzz.me/" target="_blank" class="underline text-[#52d1ff] font-bold">
+        Acceder al foro →
+      </a>`;
+                msg.classList.remove('hidden');
+                form.reset();
+            } catch {
+                msg.textContent = '❌ Error al enviar.';
+                msg.classList.remove('hidden');
+            }
+        });
+    </script>
 
 </body>
 
