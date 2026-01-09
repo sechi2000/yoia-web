@@ -2,18 +2,19 @@
 <html lang="es" class="scroll-smooth">
 
 <head>
-    <!-- SEO BASE -->
+    <!-- SEO -->
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Agentes de IA y Automatización para Empresas | YOIA.io</title>
 
     <meta name="description"
-        content="Agentes de IA y automatizaciones reales en producción. Microsoft Copilot Studio, OpenAI y Gemini con foco en seguridad, control y resultados medibles." />
+        content="Diseño y desarrollo de agentes de IA y automatizaciones reales en producción. Microsoft Copilot Studio, OpenAI y Gemini con foco en seguridad y resultados." />
     <meta name="robots" content="index, follow" />
     <link rel="canonical" href="https://yoia.io/" />
 
     <link rel="icon" type="image/png" href="./img/favicon.png" />
 
+    <!-- Tailwind -->
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800;900&display=swap" rel="stylesheet">
 
@@ -40,17 +41,6 @@
             border: 1px solid #30363d;
         }
     </style>
-
-    <script type="application/ld+json">
-    {
-      "@context":"https://schema.org",
-      "@type":"Organization",
-      "name":"YOIA.io",
-      "url":"https://yoia.io",
-      "description":"Agentes de IA y automatización enterprise para empresas",
-      "sameAs":["https://www.linkedin.com/company/yoia-io/"]
-    }
-    </script>
 </head>
 
 <body>
@@ -59,166 +49,101 @@
     <header class="sticky top-0 z-50 bg-[#0d1117]/95 backdrop-blur border-b border-gray-800">
         <nav class="max-w-7xl mx-auto px-4 py-4 flex justify-between items-center">
             <span class="text-2xl font-black text-gradient">YOIA.io</span>
-            <div class="hidden md:flex gap-6 items-center">
-                <a href="/casos.html" class="text-sm font-semibold hover:text-[#52d1ff]">Casos reales</a>
-                <a href="https://yoia.yzz.me/" target="_blank"
-                    class="text-sm font-semibold hover:text-[#52d1ff]">Foro</a>
-                <a href="#lead" class="btn-primary px-5 py-2 rounded-full text-sm font-bold">
-                    Hablar sobre mi caso
-                </a>
+            <div class="hidden md:flex gap-6 items-center text-sm font-semibold">
+                <a href="/casos.html" class="hover:text-[#52d1ff]">Casos reales</a>
+                <a href="https://yoia.yzz.me/" target="_blank" class="hover:text-[#52d1ff]">Foro</a>
+                <a href="#lead" class="btn-primary px-5 py-2 rounded-full font-bold">Hablar sobre mi caso</a>
             </div>
         </nav>
     </header>
 
     <!-- HERO -->
-    <section class="min-h-[85vh] flex items-center justify-center px-4 text-center">
+    <section class="min-h-[80vh] flex items-center justify-center px-4 text-center">
         <div class="max-w-3xl">
-            <h1 class="text-4xl sm:text-5xl md:text-6xl font-black text-white mb-6">
+            <h1 class="text-4xl sm:text-5xl md:text-6xl font-black text-white mb-5">
                 Agentes de IA y automatización<br>
                 <span class="text-gradient">para empresas</span>
             </h1>
 
-            <p class="text-lg sm:text-xl text-gray-400 mb-8">
-                Sistemas de IA diseñados para usarse en producción,
-                integrados en <strong>Microsoft Copilot Studio, OpenAI y Gemini</strong>.
+            <p class="text-base sm:text-lg text-gray-400 mb-8">
+                Sistemas de IA en producción, integrados en
+                <strong>Microsoft Copilot Studio, OpenAI y Gemini</strong>.
                 Sin demos. Sin humo.
             </p>
 
             <div class="flex flex-col sm:flex-row justify-center gap-4">
-                <a href="#lead" class="btn-primary px-8 py-3 rounded-full font-bold">
-                    Analizar mi caso
-                </a>
-                <a href="/casos.html" class="px-8 py-3 rounded-full border border-gray-600 font-semibold">
+                <a href="/casos.html" class="btn-primary px-7 py-3 rounded-full font-bold">
                     Ver casos reales
+                </a>
+                <a href="https://yoia.yzz.me/" target="_blank"
+                    class="px-7 py-3 rounded-full border border-gray-600 font-semibold">
+                    Acceder al foro
                 </a>
             </div>
 
-            <p class="text-sm text-gray-500 mt-6">
-                ✔ IA aplicada · ✔ Seguridad enterprise · ✔ Resultados medibles
+            <p class="text-xs text-gray-500 mt-5">
+                ✔ Seguridad enterprise · ✔ IA aplicada · ✔ Resultados reales
             </p>
         </div>
     </section>
 
     <!-- RESULTADOS -->
-    <section class="py-20 px-4 max-w-6xl mx-auto">
-        <h2 class="text-3xl sm:text-4xl font-bold text-center mb-12">
-            Resultados reales en producción
-        </h2>
-
-        <div class="grid sm:grid-cols-2 md:grid-cols-4 gap-6 text-center">
-            <div class="card p-6 rounded-xl">
-                <p class="text-3xl font-black text-gradient mb-2">−70%</p>
-                <p class="text-sm text-gray-400">Tiempo por consulta interna</p>
+    <section class="py-16 px-4 max-w-6xl mx-auto">
+        <div class="grid grid-cols-2 md:grid-cols-4 gap-4 text-center">
+            <div class="card p-5 rounded-xl">
+                <p class="text-2xl font-black text-gradient">−70%</p>
+                <p class="text-xs text-gray-400">Tiempo por consulta</p>
             </div>
-            <div class="card p-6 rounded-xl">
-                <p class="text-3xl font-black text-gradient mb-2">×3</p>
-                <p class="text-sm text-gray-400">Velocidad operativa</p>
+            <div class="card p-5 rounded-xl">
+                <p class="text-2xl font-black text-gradient">×3</p>
+                <p class="text-xs text-gray-400">Velocidad operativa</p>
             </div>
-            <div class="card p-6 rounded-xl">
-                <p class="text-3xl font-black text-gradient mb-2">100%</p>
-                <p class="text-sm text-gray-400">Uso en entornos reales</p>
+            <div class="card p-5 rounded-xl">
+                <p class="text-2xl font-black text-gradient">100%</p>
+                <p class="text-xs text-gray-400">Uso real</p>
             </div>
-            <div class="card p-6 rounded-xl">
-                <p class="text-3xl font-black text-gradient mb-2">0</p>
-                <p class="text-sm text-gray-400">Datos fuera del entorno</p>
+            <div class="card p-5 rounded-xl">
+                <p class="text-2xl font-black text-gradient">0</p>
+                <p class="text-xs text-gray-400">Datos fuera</p>
             </div>
-        </div>
-    </section>
-
-    <!-- COMO TRABAJO -->
-    <section class="py-20 px-4 bg-[#161b22]">
-        <div class="max-w-5xl mx-auto text-center">
-            <h2 class="text-3xl sm:text-4xl font-bold mb-10">
-                Cómo trabajo (y cómo no)
-            </h2>
-
-            <div class="grid md:grid-cols-2 gap-6 text-left text-sm">
-                <div class="card p-6 rounded-xl">
-                    <p class="font-bold text-white mb-2">✔ Lo que sí hago</p>
-                    <ul class="text-gray-400 space-y-2">
-                        <li>• Analizar procesos reales antes de usar IA</li>
-                        <li>• Diseñar agentes integrados en tu stack</li>
-                        <li>• Priorizar seguridad, control y trazabilidad</li>
-                        <li>• Medir impacto antes de escalar</li>
-                    </ul>
-                </div>
-
-                <div class="card p-6 rounded-xl">
-                    <p class="font-bold text-white mb-2">✖ Lo que no hago</p>
-                    <ul class="text-gray-400 space-y-2">
-                        <li>• Demos bonitas sin uso real</li>
-                        <li>• Vender herramientas por moda</li>
-                        <li>• Meter IA donde no aporta valor</li>
-                        <li>• Promesas sin métricas</li>
-                    </ul>
-                </div>
-            </div>
-        </div>
-    </section>
-
-    <!-- CASOS -->
-    <section class="py-20 px-4 text-center">
-        <h2 class="text-3xl font-bold mb-6">
-            Casos reales documentados
-        </h2>
-        <p class="text-gray-400 mb-8 max-w-2xl mx-auto">
-            Agentes internos, automatización operativa y sistemas
-            que conectan web, WhatsApp y agenda.
-        </p>
-        <a href="/casos.html" class="btn-primary px-8 py-3 rounded-full font-bold">
-            Ver casos reales →
-        </a>
-    </section>
-
-    <!-- FORO -->
-    <section class="py-16 px-4 text-center">
-        <div class="max-w-2xl mx-auto card p-8 rounded-2xl">
-            <h3 class="text-2xl font-bold mb-4">Comunidad YOIA</h3>
-            <p class="text-gray-400 mb-6">
-                Casos, decisiones técnicas y automatizaciones reales
-                compartidas sin postureo.
-            </p>
-            <a href="https://yoia.yzz.me/" target="_blank" class="btn-primary px-7 py-3 rounded-full font-bold">
-                Acceder al foro
-            </a>
         </div>
     </section>
 
     <!-- FORMULARIO -->
-    <section id="lead" class="py-20 bg-[#161b22] px-4">
+    <section id="lead" class="py-20 px-4 bg-[#161b22]">
         <div class="max-w-md mx-auto text-center">
             <h2 class="text-2xl sm:text-3xl font-bold mb-4">
                 ¿Hablamos de tu caso?
             </h2>
-            <p class="text-gray-400 mb-6">
-                Déjame tus datos y te contacto directamente.
+            <p class="text-gray-400 mb-6 text-sm">
+                Te contacto por la vía que prefieras.
             </p>
 
-            <form id="leadForm" class="flex flex-col gap-4">
-                <select id="tipo" required class="px-4 py-3 rounded bg-black border border-gray-700">
-                    <option value="">Soy…</option>
+            <form id="leadForm" class="flex flex-col gap-3">
+                <select id="tipo" class="px-4 py-3 rounded bg-black border border-gray-700 text-sm" required>
+                    <option value="">Tipo de contacto</option>
                     <option value="empresa">Empresa</option>
                     <option value="autonomo">Autónomo</option>
                     <option value="persona">Persona</option>
                 </select>
 
-                <input id="nombre" type="text" required placeholder="Tu nombre"
-                    class="px-4 py-3 rounded bg-black border border-gray-700">
+                <input id="nombre" type="text" placeholder="Nombre"
+                    class="px-4 py-3 rounded bg-black border border-gray-700 text-sm" required>
 
-                <input id="telefono" type="tel" required placeholder="Tu teléfono / WhatsApp"
-                    class="px-4 py-3 rounded bg-black border border-gray-700">
+                <input id="email" type="email" placeholder="Email"
+                    class="px-4 py-3 rounded bg-black border border-gray-700 text-sm" required>
 
-                <input id="email" type="email" required placeholder="Tu email"
-                    class="px-4 py-3 rounded bg-black border border-gray-700">
+                <input id="telefono" type="tel" placeholder="WhatsApp / Teléfono"
+                    class="px-4 py-3 rounded bg-black border border-gray-700 text-sm" required>
 
-                <button type="submit" class="btn-primary py-3 rounded-full font-bold">
+                <button type="submit" class="btn-primary py-3 rounded-full font-bold text-sm">
                     Enviar
                 </button>
 
-                <p id="formMsg" class="text-sm text-gray-400 hidden"></p>
+                <p id="formMsg" class="text-xs text-gray-400 hidden mt-2"></p>
             </form>
 
-            <!-- AGENDA -->
+            <!-- CALENDAR -->
             <div class="mt-8">
                 <link href="https://calendar.google.com/calendar/scheduling-button-script.css" rel="stylesheet">
                 <script src="https://calendar.google.com/calendar/scheduling-button-script.js" async></script>
@@ -236,7 +161,12 @@
         </div>
     </section>
 
-    <footer class="py-10 text-center border-t border-gray-800 text-sm">
+    <!-- FOOTER -->
+    <footer class="py-10 text-center border-t border-gray-800 text-xs">
+        <div class="flex justify-center gap-6 mb-3">
+            <a href="/casos.html" class="hover:text-[#52d1ff]">Casos reales</a>
+            <a href="https://yoia.yzz.me/" target="_blank" class="hover:text-[#52d1ff]">Foro</a>
+        </div>
         <p class="text-gray-500">© 2026 YOIA.io</p>
     </footer>
 
@@ -246,12 +176,11 @@
 
         form.addEventListener('submit', async e => {
             e.preventDefault();
-
             const payload = {
-                tipo: document.getElementById('tipo').value,
-                nombre: document.getElementById('nombre').value,
-                telefono: document.getElementById('telefono').value,
-                email: document.getElementById('email').value,
+                tipo: tipo.value,
+                nombre: nombre.value,
+                email: email.value,
+                telefono: telefono.value,
                 source: 'yoia.io',
                 timestamp: new Date().toISOString()
             };
@@ -263,11 +192,7 @@
                     body: JSON.stringify(payload)
                 });
 
-                msg.innerHTML = `✅ Gracias, te contactaré personalmente.<br><br>
-            <a href="https://yoia.yzz.me/" target="_blank"
-               class="underline text-[#52d1ff] font-bold">
-              Acceder al foro →
-            </a>`;
+                msg.innerHTML = '✅ Recibido. Te contactaré pronto.';
                 msg.classList.remove('hidden');
                 form.reset();
             } catch {
