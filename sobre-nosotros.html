@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html lang="es" class="scroll-smooth">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Manifiesto YOIA · Arquitectura de IA real</title>
+
+  <meta name="description"
+    content="Manifiesto YOIA: visión, misión, valores e historia. Arquitectura de IA diseñada para producción real." />
+  <link rel="icon" href="./img/favicon.png" />
+
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800;900&display=swap" rel="stylesheet">
+
+  <style>
+    body {
+      font-family: 'Inter', sans-serif;
+      background: #0d1117;
+      color: #c9d1d9;
+    }
+
+    .text-gradient {
+      background: linear-gradient(to right, #52d1ff, #0072FF);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+
+    .card {
+      background: #161b22;
+      border: 1px solid #30363d;
+    }
+
+    .btn-primary {
+      background: linear-gradient(to right, #52d1ff, #0072FF);
+      color: #000;
+    }
+  </style>
+</head>
+
+<body>
+
+  <!-- BOTONES FLOTANTES -->
+  <div class="fixed bottom-4 right-4 z-50 flex flex-col gap-3">
+    <a href="yoiaio/YOIA-Manifiesto-Arquitectura-IA.pdf" download
+      class="btn-primary px-6 py-3 rounded-full font-bold shadow-xl text-center">
+      Descargar Manifiesto PDF
+    </a>
+    <a href="/#lead" id="floatingCTA" class="px-6 py-3 rounded-full font-bold border border-gray-600 text-center">
+      Leer manifiesto
+    </a>
+  </div>
+
+  <!-- HEADER -->
+  <header class="sticky top-0 z-40 bg-[#0d1117]/95 backdrop-blur border-b border-gray-800">
+    <nav class="max-w-7xl mx-auto px-4 py-4 flex justify-between items-center">
+      <a href="/index.html" class="text-2xl font-black text-gradient">YOIA.io</a>
+      <div class="hidden md:flex gap-6 text-sm font-semibold">
+        <a href="/index.html">Inicio</a>
+        <a href="/casos.html">Casos reales</a>
+        <a href="https://yoia.yzz.me/" target="_blank">Foro</a>
+      </div>
+    </nav>
+  </header>
+
+  <!-- HERO -->
+  <section class="py-28 px-4 text-center">
+    <h1 class="text-4xl md:text-6xl font-black text-white mb-6">
+      El Manifiesto YOIA
+    </h1>
+    <p class="text-xl text-gray-400 max-w-3xl mx-auto">
+      Arquitectura de <span class="text-gradient font-bold">IA real</span>
+      para sistemas que viven en producción.
+    </p>
+  </section>
+
+  <!-- MATRIZ IDENTIDAD (DAFO REINTERPRETADO) -->
+  <section class="max-w-6xl mx-auto px-4 py-24">
+    <h2 class="text-3xl font-black text-center mb-16">
+      Los cuatro pilares de YOIA
+    </h2>
+
+    <div class="grid md:grid-cols-2 gap-8">
+
+      <!-- VISIÓN -->
+      <div class="card p-8 rounded-2xl">
+        <h3 class="text-xl font-black text-gradient mb-4">Visión</h3>
+        <p class="text-gray-400">
+          Convertir la IA en infraestructura fiable, gobernable
+          y sostenible para organizaciones reales.
+        </p>
+      </div>
+
+      <!-- VALORES -->
+      <div class="card p-8 rounded-2xl">
+        <h3 class="text-xl font-black text-gradient mb-4">Valores</h3>
+        <p class="text-gray-400">
+          Criterio técnico, seguridad por defecto,
+          trazabilidad y realismo operativo.
+        </p>
+      </div>
+
+      <!-- MISIÓN -->
+      <div class="card p-8 rounded-2xl">
+        <h3 class="text-xl font-black text-gradient mb-4">Misión</h3>
+        <p class="text-gray-400">
+          Diseñar agentes y automatizaciones de IA
+          que sobrevivan al uso diario, auditorías y decisiones críticas.
+        </p>
+      </div>
+
+      <!-- HISTORIA -->
+      <div class="card p-8 rounded-2xl">
+        <h3 class="text-xl font-black text-gradient mb-4">Historia</h3>
+        <p class="text-gray-400">
+          YOIA nace tras ver cómo la mayoría de proyectos de IA
+          fracasan por falta de arquitectura, no por el modelo.
+        </p>
+      </div>
+
+    </div>
+  </section>
+
+  <!-- MANIFIESTO INTERACTIVO / PDF -->
+  <section class="max-w-7xl mx-auto px-4 pb-32">
+    <h2 class="text-3xl font-black mb-8 text-center">
+      Manifiesto completo
+    </h2>
+
+    <iframe src="yoiaio/YOIA-Manifiesto-Arquitectura-IA.pdf" class="w-full h-[80vh] rounded-2xl border border-gray-700">
+    </iframe>
+  </section>
+
+  <footer class="py-16 text-center text-xs text-gray-500 border-t border-gray-800">
+    © 2026 YOIA.io · Arquitectura de IA con criterio empresarial
+  </footer>
+
+  <script>
+    const cta = document.getElementById('floatingCTA');
+    window.addEventListener('scroll', () => {
+      const y = window.scrollY;
+      if (y < 600) cta.textContent = 'Leer manifiesto';
+      else if (y < 1400) cta.textContent = 'Únete al foro';
+      else cta.textContent = 'Analizar mi caso';
+    });
+  </script>
+
+</body>
+
+</html>
